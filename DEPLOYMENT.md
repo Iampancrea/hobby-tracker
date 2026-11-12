@@ -1,165 +1,81 @@
-# Hobby Tracker - 24/7 Deployment Guide
+# Hobby Tracker — Zero-Cost Offline Deployment Guide
 
-## The Login Bug (FIXED)
-There was a bug in `public/js/auth.js` where the form submit handler wasn't being attached when a password already existed. **Fixed.** Hard refresh your browser (Ctrl+Shift+R) and it should work now.
+Your project is transformed into a **100% Offline-First Progressive Web App (PWA)** with **End-to-End Encrypted Cloud Sync**.
 
----
-
-## Running 24/7 — Your Options
-
-### Truth: nothing runs when the PC is off.
-
-Here are your real options:
+- **Hosting Cost**: \$0 (Free forever via GitHub Pages)
+- **Offline Capable**: Works 100% offline on PC and Android via Service Worker & IndexedDB
+- **No 24/7 PC Required**: Android works independently anywhere, syncing asynchronously
+- **Encryption**: AES-256-GCM zero-knowledge encryption before data leaves your browser
+- **Sync Provider**: Private GitHub Gist (free, unlimited revisions, zero server overhead)
 
 ---
 
-### Option A: Run on Your PC (Free, Works from Anywhere)
+## Step 1: Push Code to Your GitHub Account (Only Done Once)
 
-**What you get:** Server runs on your PC, accessible from your phone/laptop anywhere via Tailscale.
-
-**Requirements:**
-- PC stays powered on (disable sleep)
-- Node.js installed
-
-**Setup:**
-
-1. **Install as Windows Service (auto-start on boot):**
-   - Right-click `install-service.bat`
-   - Select "Run as administrator"
-   - Follow prompts
-
-2. **Disable Sleep Mode:**
-   - Settings → System → Power & sleep
-   - Set "Sleep" to "Never"
-
-3. **Access from Other Devices (same WiFi):**
-   - Open `http://<your-PC-IP>:3000` (the IP is shown when you run `node server.js`)
-
-4. **Access from ANYWHERE (phone, outside home):**
-   - Install [Tailscale](https://tailscale.com) (free for personal use)
-   - Install on your PC and phone
-   - Log in with same account on both
-   - Open `http://<your-tailscale-IP>:3000` on your phone
-
-**Pros:** Free, full control, data stays on your machine  
-**Cons:** PC must stay on
-
----
-
-### Option B: Deploy to Cloud (True 24/7, ~$1/month)
-
-**What you get:** Server runs in the cloud, always online, accessible from anywhere.
-
-**Requirements:**
-- Render.com account (free to sign up)
-- GitHub repo (optional but recommended)
-
-**Setup:**
-
-1. **Push to GitHub:**
+1. Open your browser and go to [GitHub.com/new](https://github.com/new).
+2. Set **Repository name**: `hobby-tracker`
+3. Set visibility to **Public** (recommended for free GitHub Pages) or **Private** (with Cloudflare Pages).
+   > *Note:* Your personal habits, diary entries, and passwords are **never** stored in the repository. The repo only contains static app code (HTML, CSS, JS). Your data stays strictly on your devices and in your private encrypted Gist.
+4. Leave "Add a README" **unchecked** (we already have everything).
+5. Click **Create repository**.
+6. Run these two commands in PowerShell / Terminal:
    ```bash
-   cd "D:\amol\projects\hobby tracker website"
-   git init
-   git add .
-   git commit -m "initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/hobby-tracker.git
+   git remote add origin https://github.com/YOUR_GITHUB_USERNAME/hobby-tracker.git
    git push -u origin main
    ```
 
-2. **Deploy on Render:**
-   - Go to [render.com](https://render.com)
-   - Sign up (free)
-   - Click "New +" → "Web Service"
-   - Connect your GitHub repo
-   - Configure:
-     - **Name:** hobby-tracker
-     - **Environment:** Docker
-     - **Plan:** Free (or Starter for persistent disk)
-     - **Health Check Path:** `/api/state`
-   - Click "Create Web Service"
+---
 
-3. **Important — Persistent Storage:**
-   - Render's free tier has ephemeral storage (data resets on deploys)
-   - For persistent data, use the **Starter plan ($7/month)** which includes a 1GB disk
-   - The `render.yaml` file configures this automatically
+## Step 2: Enable GitHub Pages
 
-4. **Access:**
-   - Render gives you a URL like `hobby-tracker.onrender.com`
-   - Open it from any device, anywhere
-
-**Pros:** True 24/7, no PC needed, accessible globally  
-**Cons:** ~$7/month for persistent storage (free tier loses data on restarts)
+1. In your GitHub repository, go to **Settings** → **Pages**.
+2. Under **Build and deployment** → **Source**:
+   - Select **GitHub Actions** (our included workflow will automatically build and deploy it), OR
+   - Select **Deploy from a branch** → Branch: `main` → Folder: `/ (root)` → Click **Save**.
+3. Your app is live at:
+   `https://YOUR_GITHUB_USERNAME.github.io/hobby-tracker/`
 
 ---
 
-### Option C: Oracle Cloud Free Tier (True 24/7, Free but Complex)
+## Step 3: Install on PC & Android
 
-Oracle offers a genuinely free always-on VM (ARM, 4 cores, 24GB RAM).
+### On PC (Windows / Mac / Linux)
+1. Open your GitHub Pages URL in **Google Chrome** or **Microsoft Edge**.
+2. In the URL address bar, click the **Install App** icon (or click the 3 dots menu → **Save and Share** → **Install Hobby Tracker**).
+3. The app opens in its own clean window, with taskbar pinning and full offline capabilities.
 
-**Pros:** Completely free, true 24/7  
-**Cons:** Complex setup (Linux VM, SSH, firewall config, domain/DNS optional)
-
-If you want this, I can write a deploy script for you. Just ask.
-
----
-
-## My Recommendation
-
-**Start with Option A** (your PC + Tailscale). It's free, fast, and you control everything. Only move to cloud if you need true 24/7 without keeping your PC on.
-
-If you want **zero maintenance cloud**, use Render with the Starter plan.
+### On Android Phone
+1. Open your GitHub Pages URL in **Google Chrome**.
+2. Tap the **3 dots menu** in the top right.
+3. Tap **Install App** (or **Add to Home screen**).
+4. An icon will appear on your home screen and app drawer.
+5. Tap it: it runs fullscreen, exactly like a native app, and works 100% offline.
 
 ---
 
-## Quick Start (Local Testing)
+## Step 4: Connect Encrypted Sync (PC ⟷ Android)
 
+To have your PC and Android sync seamlessly without keeping your PC awake:
+
+1. Go to [GitHub Token Settings](https://github.com/settings/tokens/new) (GitHub → Settings → Developer Settings → Personal access tokens → Tokens (classic) → Generate new token).
+2. Set **Note**: `Hobby Tracker Sync`
+3. Under Scopes, check only:
+   - `gist` (Create gists)
+4. Click **Generate token** and copy the `ghp_...` string.
+5. Open Hobby Tracker on your PC and Android:
+   - Go to **Settings** tab → **Encrypted Cloud Sync**.
+   - Paste your token into **GitHub Personal Access Token**.
+   - Click **Save Sync Settings** → **Sync Now**.
+6. The app will automatically create a secret encrypted Gist `hobby_tracker_vault.json.enc` and sync.
+7. Any changes you make on phone or PC will now sync smoothly!
+
+---
+
+## Local Development / Offline Testing
+
+If you ever want to test locally on your PC before pushing:
 ```bash
-cd "D:\amol\projects\hobby tracker website"
+# Using Node.js
 node server.js
 ```
-
-Then open `http://localhost:3000`
-
----
-
-## Files in This Project
-
-```
-hobby tracker website/
-├── server.js              # Node.js backend (zero dependencies)
-├── data.json              # Auto-created, stores all your data
-├── install-service.bat    # Windows service installer
-├── Dockerfile             # For cloud deployment
-├── render.yaml            # Render.com config
-├── public/
-│   ├── index.html         # Main page
-│   ├── css/style.css      # Notion-style theming
-│   └── js/
-│       ├── api.js         # API client
-│       ├── auth.js        # Login/logout
-│       ├── views.js       # UI rendering
-│       └── app.js         # Main app logic
-└── README.md              # This file
-```
-
----
-
-## Features
-
-✅ **Daily Habit Tracker** — Calendar view with habits on left, scrollable dates on right  
-✅ **Notes with Personality** — Love notes (pink serif), discipline notes (dark mono), default notes  
-✅ **Calendar Tasks** — Persistent tasks spanning months/years  
-✅ **Daily Diary** — Per-day entries, tasks, mood tracker  
-✅ **Motivational Quotes** — Rotating quotes you can add/edit  
-✅ **Settings** — Change password, export/import data  
-✅ **Multi-Device** — Access from any device on your network (or anywhere with Tailscale)  
-✅ **Session-Only Auth** — Close browser = logged out, but data persists
-
----
-
-## Need Help?
-
-- Login not working? Hard refresh (Ctrl+Shift+R)
-- Server won't start? Make sure Node.js is installed: `node --version`
-- Can't access from phone? Check firewall allows port 3000
-- Want cloud deploy? I can write step-by-step instructions for any platform
+Open `http://localhost:3000` in your browser.

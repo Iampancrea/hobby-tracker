@@ -1,0 +1,231 @@
+/* === NOTES MODAL === */
+.note-modal {
+  max-width: 600px;
+  transition: all 0.3s ease;
+}
+
+.note-modal.log {
+  background: var(--note-log-bg);
+}
+
+.note-modal.love {
+  background: var(--note-love-bg);
+}
+
+.note-modal.discipline {
+  background: var(--note-discipline-bg);
+  color: white;
+}
+
+.note-modal.insight {
+  background: var(--note-insight-bg);
+}
+
+.note-modal.vent {
+  background: var(--note-vent-bg);
+  color: white;
+}
+
+.note-modal.win {
+  background: var(--note-win-bg);
+}
+
+/* Kind selector */
+.kind-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.kind-option {
+  padding: 0.5rem 1rem;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+
+.kind-option:hover {
+  border-color: var(--accent);
+}
+
+.kind-option.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+/* Note form */
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.note-field label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.note-title-input {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.note-body-input {
+  min-height: 150px;
+  line-height: 1.6;
+}
+
+/* Kind-specific styling */
+.note-modal.log .note-title-input,
+.note-modal.log .note-body-input {
+  font-family: var(--font-sans);
+}
+
+.note-modal.love .note-title-input,
+.note-modal.love .note-body-input {
+  font-family: var(--font-serif);
+  font-style: italic;
+}
+
+.note-modal.love .note-title-input {
+  font-size: 1.5rem;
+}
+
+.note-modal.discipline .note-title-input,
+.note-modal.discipline .note-body-input {
+  font-family: var(--font-mono);
+}
+
+.note-modal.discipline .note-title-input {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.note-modal.insight .note-title-input,
+.note-modal.insight .note-body-input {
+  font-family: var(--font-serif);
+}
+
+.note-modal.vent .note-title-input,
+.note-modal.vent .note-body-input {
+  font-family: var(--font-mono);
+}
+
+.note-modal.win .note-title-input,
+.note-modal.win .note-body-input {
+  font-family: var(--font-serif);
+}
+
+/* Mood picker for notes */
+.note-mood-picker {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.note-mood-option {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.note-mood-option:hover {
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.note-mood-option.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* Note context */
+.note-context {
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.note-modal.discipline .note-context,
+.note-modal.vent .note-context {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Notes list */
+.notes-list {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.notes-list-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.notes-peek {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.note-peek-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.note-peek-item:hover {
+  background: var(--bg-hover);
+}
+
+.note-peek-kind {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+}
+
+.note-peek-kind.log { background: var(--note-log-border); }
+.note-peek-kind.love { background: var(--note-love-border); color: white; }
+.note-peek-kind.discipline { background: var(--note-discipline-border); color: white; }
+.note-peek-kind.insight { background: var(--note-insight-border); color: white; }
+.note-peek-kind.vent { background: var(--note-vent-border); color: white; }
+.note-peek-kind.win { background: var(--note-win-border); color: white; }
+
+.note-peek-title {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.note-peek-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: hobby-tracker
+    env: docker
+    plan: free
+    healthCheckPath: /api/state
+    disk:
+      name: data
+      mountPath: /usr/src/app/data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production

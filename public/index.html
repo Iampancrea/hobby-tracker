@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#3fa34d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Hobby Tracker</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital@1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Login & Quick PIN Screen -->
+  <div id="login-screen" class="screen">
+    <div class="login-container">
+      <div class="login-card">
+        <div class="app-brand-icon">
+          <img src="./icons/icon.svg" alt="Hobby Tracker Logo" width="56" height="56">
+        </div>
+        <h1>Hobby Tracker</h1>
+        <p class="login-subtitle" id="login-subtitle">Unlock your vault</p>
+
+        <!-- PIN Pad Display -->
+        <div id="pin-pad-container" class="pin-pad-container" style="display:none;">
+          <div class="pin-dots">
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+          </div>
+          <div class="pin-grid">
+            <button type="button" class="pin-btn" data-val="1">1</button>
+            <button type="button" class="pin-btn" data-val="2">2</button>
+            <button type="button" class="pin-btn" data-val="3">3</button>
+            <button type="button" class="pin-btn" data-val="4">4</button>
+            <button type="button" class="pin-btn" data-val="5">5</button>
+            <button type="button" class="pin-btn" data-val="6">6</button>
+            <button type="button" class="pin-btn" data-val="7">7</button>
+            <button type="button" class="pin-btn" data-val="8">8</button>
+            <button type="button" class="pin-btn" data-val="9">9</button>
+            <button type="button" class="pin-btn pin-btn-ghost"></button>
+            <button type="button" class="pin-btn" data-val="0">0</button>
+            <button type="button" class="pin-btn pin-btn-back" data-val="back" title="Backspace">⌫</button>
+          </div>
+          <div class="auth-switch">
+            <a href="#" id="use-password-link">Unlock with Master Password</a>
+          </div>
+        </div>
+
+        <!-- Master Password Form -->
+        <form id="login-form">
+          <div class="input-group">
+            <label for="password">Master Password</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password">
+          </div>
+          <div id="confirm-password-group" class="input-group" style="display:none;">
+            <label for="confirm-password">Confirm Password</label>
+            <input type="password" id="confirm-password" name="confirm-password">
+          </div>
+          <div id="setup-pin-group" class="input-group" style="display:none;">
+            <label for="setup-pin">Create 4-Digit Quick PIN (Recommended for Phone & PC)</label>
+            <input type="password" id="setup-pin" name="setup-pin" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" placeholder="e.g. 1234">
+          </div>
+          <div id="login-error" class="error-message" style="display:none;"></div>
+          <button type="submit" id="login-btn" class="btn btn-primary btn-block">Sign In</button>
+          <div class="auth-switch" id="switch-to-pin-container" style="display:none;">
+            <a href="#" id="use-pin-link">Switch to Quick PIN</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App Shell -->
+  <div id="app" class="screen" style="display:none;">
+    <!-- Mobile Header with Hamburger & Sync -->
+    <header class="mobile-topbar">
+      <button id="mobile-menu-btn" class="btn btn-icon" title="Toggle Menu">☰</button>
+      <span class="mobile-brand">Hobby Tracker</span>
+      <div id="mobile-sync-badge" class="sync-badge" title="Sync status">
+        <span class="sync-dot"></span>
+        <span class="sync-text">Synced</span>
+      </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <img src="./icons/icon.svg" alt="Logo" width="24" height="24">
+          <h2>Hobby Tracker</h2>
+        </div>
+        <button id="sidebar-close-btn" class="btn btn-icon mobile-only" title="Close Menu">&times;</button>
+      </div>
+
+      <!-- Sync Status Widget -->
+      <div class="sidebar-sync-widget">
+        <div id="sidebar-sync-indicator" class="sync-badge">
+          <span class="sync-dot"></span>
+          <span class="sync-label">Offline Ready</span>
+        </div>
+        <button id="sidebar-sync-btn" class="btn btn-icon btn-small" title="Sync now with GitHub Gist">🔄</button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="habits">
+          <span class="nav-icon">📅</span>
+          <span>Habits</span>
+        </button>
+        <button class="nav-item" data-view="tasks">
+          <span class="nav-icon">✓</span>
+          <span>Tasks</span>
+        </button>
+        <button class="nav-item" data-view="diary">
+          <span class="nav-icon">📖</span>
+          <span>Diary</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-icon">⚙</span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="lock-btn" class="btn btn-secondary btn-small" title="Lock App">🔒 Lock</button>
+        <button id="logout-btn" class="btn btn-secondary btn-small">Exit</button>
+      </div>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <main class="main-content">
+      <!-- Habits View -->
+      <div id="view-habits" class="view active">
+        <div class="view-header">
+          <h1>Daily Habits</h1>
+          <div class="view-controls">
+            <button id="prev-week" class="btn btn-icon" title="Previous week">◀</button>
+            <button id="today-btn" class="btn btn-small">Today</button>
+            <button id="next-week" class="btn btn-icon" title="Next week">▶</button>
+          </div>
+        </div>
+        <div class="habit-controls">
+          <button id="add-habit-btn" class="btn btn-primary btn-small">+ Add Habit</button>
+          <label class="toggle-label">
+            <input type="checkbox" id="show-archived-habits">
+            <span>Show archived</span>
+          </label>
+        </div>
+        <div class="habit-grid-container">
+          <div class="habit-grid" id="habit-grid">
+            <div class="empty-state">
+              <p>No habits yet. Add one to get started!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks View -->
+      <div id="view-tasks" class="view">
+        <div class="view-header">
+          <h1>Calendar Tasks</h1>
+          <div class="view-controls">
+            <button id="prev-week-tasks" class="btn btn-icon" title="Previous week">◀</button>
+            <button id="today-btn-tasks" class="btn btn-small">Today</button>
+            <button id="next-week-tasks" class="btn btn-icon" title="Next week">▶</button>
+          </div>
+        </div>
+        <div class="task-controls">
+          <button id="add-task-btn" class="btn btn-primary btn-small">+ Add Task</button>
+          <label class="toggle-label">
+            <input type="checkbox" id="show-archived-tasks">
+            <span>Show archived</span>
+          </label>
+        </div>
+        <div class="task-grid-container">
+          <div class="task-grid" id="task-grid">
+            <div class="empty-state">
+              <p>No tasks yet. Add one to get started!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diary View -->
+      <div id="view-diary" class="view">
+        <div class="view-header">
+          <h1>Daily Diary</h1>
+          <div class="date-picker">
+            <button id="prev-day" class="btn btn-icon">◀</button>
+            <input type="date" id="diary-date">
+            <button id="next-day" class="btn btn-icon">▶</button>
+          </div>
+        </div>
+        <div class="diary-content">
+          <div class="quote-section" id="quote-section">
+            <blockquote id="quote-text"></blockquote>
+            <cite id="quote-author"></cite>
+          </div>
+          <div class="diary-section">
+            <h3>Today's Entry</h3>
+            <textarea id="diary-entry" placeholder="How was your day? What did you learn? What are you grateful for?"></textarea>
+          </div>
+          <div class="diary-section">
+            <h3>Today's Tasks</h3>
+            <div id="diary-tasks" class="diary-tasks-list">
+              <div class="empty-state">
+                <p>No tasks for today. Add one below.</p>
+              </div>
+            </div>
+            <div class="add-diary-task">
+              <input type="text" id="new-diary-task" placeholder="Add a task for today...">
+              <button id="add-diary-task-btn" class="btn btn-primary btn-small">Add</button>
+            </div>
+          </div>
+          <div class="diary-section">
+            <h3>Mood</h3>
+            <div class="mood-selector" id="mood-selector">
+              <button class="mood-btn" data-mood="great">😄 Great</button>
+              <button class="mood-btn" data-mood="good">🙂 Good</button>
+              <button class="mood-btn" data-mood="okay">😐 Okay</button>
+              <button class="mood-btn" data-mood="bad">😕 Bad</button>
+              <button class="mood-btn" data-mood="terrible">😢 Terrible</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings View -->
+      <div id="view-settings" class="view">
+        <div class="view-header">
+          <h1>Settings</h1>
+        </div>
+        <div class="settings-content">
+          <!-- Encrypted Cloud Sync Section -->
+          <div class="settings-section">
+            <h3>Encrypted Cloud Sync (GitHub Gist)</h3>
+            <p class="settings-description">
+              Sync habits and diary smoothly between PC & Android with <strong>zero hosting costs</strong>.
+              All data is encrypted with <strong>AES-256-GCM</strong> on your device before leaving your browser.
+            </p>
+            <form id="sync-settings-form">
+              <div class="input-group">
+                <label for="sync-github-token">GitHub Personal Access Token (PAT)</label>
+                <input type="password" id="sync-github-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                <small class="field-hint">Token needs only the <code>gist</code> permission.</small>
+              </div>
+              <div class="input-group">
+                <label for="sync-gist-id">Gist ID (Optional)</label>
+                <input type="text" id="sync-gist-id" placeholder="Auto-detected or created automatically" readonly>
+              </div>
+              <div class="input-group-checkbox">
+                <label class="toggle-label">
+                  <input type="checkbox" id="sync-auto-toggle" checked>
+                  <span>Auto-sync when changes occur and on app launch</span>
+                </label>
+              </div>
+              <div class="sync-actions-row">
+                <button type="submit" class="btn btn-primary btn-small">Save Sync Settings</button>
+                <button type="button" id="manual-sync-btn" class="btn btn-secondary btn-small">🔄 Sync Now</button>
+              </div>
+              <div id="sync-settings-msg" class="sync-status-message" style="display:none;"></div>
+            </form>
+          </div>
+
+          <!-- Quick PIN & Master Password Section -->
+          <div class="settings-section">
+            <h3>Security & Quick Unlock</h3>
+            <div class="sub-section">
+              <h4>Quick PIN (4-Digits)</h4>
+              <p class="settings-description">Allows instant unlock on this device without typing your long master password.</p>
+              <form id="change-pin-form">
+                <div class="input-group">
+                  <label for="new-pin-input">Set New 4-Digit PIN</label>
+                  <input type="password" id="new-pin-input" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" placeholder="4 digits">
+                </div>
+                <div id="pin-status-msg" class="success-message" style="display:none;"></div>
+                <button type="submit" class="btn btn-secondary btn-small">Update PIN</button>
+                <button type="button" id="remove-pin-btn" class="btn btn-danger btn-small">Disable PIN</button>
+              </form>
+            </div>
+
+            <div class="sub-section" style="margin-top: 24px;">
+              <h4>Master Password</h4>
+              <p class="settings-description">Used to derive your AES-256 vault encryption key.</p>
+              <form id="change-password-form">
+                <div class="input-group">
+                  <label for="current-password">Current Password</label>
+                  <input type="password" id="current-password" required>
+                </div>
+                <div class="input-group">
+                  <label for="new-password">New Password</label>
+                  <input type="password" id="new-password" required minlength="4">
+                </div>
+                <div class="input-group">
+                  <label for="confirm-new-password">Confirm New Password</label>
+                  <input type="password" id="confirm-new-password" required>
+                </div>
+                <div id="password-error" class="error-message" style="display:none;"></div>
+                <div id="password-success" class="success-message" style="display:none;"></div>
+                <button type="submit" class="btn btn-primary btn-small">Change Master Password</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Quotes Section -->
+          <div class="settings-section">
+            <h3>Motivational Quotes</h3>
+            <div id="quotes-list"></div>
+            <form id="add-quote-form" class="add-quote-form">
+              <input type="text" id="new-quote-text" placeholder="Quote text..." required>
+              <input type="text" id="new-quote-author" placeholder="Author (optional)">
+              <button type="submit" class="btn btn-primary btn-small">Add Quote</button>
+            </form>
+          </div>
+
+          <!-- Data Management Section -->
+          <div class="settings-section">
+            <h3>Data Management</h3>
+            <p class="settings-description">Export your complete vault backup or restore an existing backup file.</p>
+            <div class="data-buttons">
+              <button id="export-btn" class="btn btn-secondary">Export JSON Backup</button>
+              <label class="btn btn-secondary">
+                Import JSON Backup
+                <input type="file" id="import-file" accept=".json" style="display:none;">
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Note Modal -->
+  <div id="note-modal" class="modal" style="display:none;">
+    <div class="modal-content note-modal-content">
+      <div class="modal-header">
+        <h2 id="note-modal-title">Add Note</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="note-type-selector">
+        <button class="note-type-btn active" data-type="default">Default</button>
+        <button class="note-type-btn" data-type="love">Love</button>
+        <button class="note-type-btn" data-type="discipline">Discipline</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="note-text" placeholder="Write your note..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="delete-note-btn" class="btn btn-danger" style="display:none;">Delete</button>
+        <button id="save-note-btn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Habit Modal -->
+  <div id="habit-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="habit-modal-title">Add Habit</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="habit-name">Habit Name</label>
+          <input type="text" id="habit-name" required>
+        </div>
+        <div class="input-group">
+          <label for="habit-icon">Icon</label>
+          <input type="text" id="habit-icon" placeholder="●" maxlength="2">
+        </div>
+        <div class="input-group">
+          <label for="habit-color">Color</label>
+          <input type="color" id="habit-color" value="#3fa34d">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="archive-habit-btn" class="btn btn-secondary" style="display:none;">Archive</button>
+        <button id="delete-habit-btn" class="btn btn-danger" style="display:none;">Delete</button>
+        <button id="save-habit-btn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Task Modal -->
+  <div id="task-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="task-modal-title">Add Task</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="task-title">Task Title</label>
+          <input type="text" id="task-title" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="archive-task-btn" class="btn btn-secondary" style="display:none;">Archive</button>
+        <button id="delete-task-btn" class="btn btn-danger" style="display:none;">Delete</button>
+        <button id="save-task-btn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Modules -->
+  <script src="./js/crypto.js"></script>
+  <script src="./js/storage.js"></script>
+  <script src="./js/sync.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/views.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

@@ -4,98 +4,171 @@ const Views = {
   currentHabitDateOffset: 0,
   currentTaskDateOffset: 0,
   currentDiaryDate: new Date().toISOString().split('T')[0],
+  _activeQuote: null,
 
   async loadState() {
     this.state = await API.getState();
+    this.renderTopQuote();
+  },
+
+  renderTopQuote(forceRefresh = false) {
+    const banner = document.getElementById('top-quote-banner');
+    if (!banner) return;
+
+    const quotes = (this.state && this.state.quotes) || [];
+    if (!quotes.length) {
+      banner.style.display = 'none';
+      this._activeQuote = null;
+      return;
+    }
+
+    // Retain current quote on routine view switching unless forced or deleted
+    if (!forceRefresh && this._activeQuote && quotes.some(q => q.id === this._activeQuote.id)) {
+      banner.style.display = 'block';
+      return;
+    }
+
+    // Deterministic daily index with quote count modulo
+    const todayStr = new Date().toISOString().split('T')[0];
+    let hash = 0;
+    for (let i = 0; i < todayStr.length; i++) {
+      hash = ((hash << 5) - hash) + todayStr.charCodeAt(i);
+    }
+    const quoteIndex = Math.abs(hash) % quotes.length;
+    const selectedQuote = quotes[quoteIndex] || quotes[0];
+    this._activeQuote = selectedQuote;
+
+    const quoteTextEl = document.getElementById('quote-text') || banner.querySelector('blockquote');
+    const quoteAuthorEl = document.getElementById('quote-author') || banner.querySelector('cite');
+
+    if (quoteTextEl) {
+      const cleanText = (selectedQuote.text || '').trim().replace(/^["“]+|["”]+$/g, '');
+      quoteTextEl.textContent = `"${cleanText}"`;
+    }
+
+    if (quoteAuthorEl) {
+      const author = (selectedQuote.author || '').trim() || 'Unknown';
+      quoteAuthorEl.textContent = `— ${author}`;
+    }
+
+    banner.style.display = 'block';
   },
 
   // Date helpers
-  getDatesAround(offset = 0, pastDays = 7, futureDays = 3) {
+  formatDateKey(d = new Date()) {
+    if (typeof d === 'string') return d.split('T')[0];
+    return d.toISOString().split('T')[0];
+  },
+
+  getDatesAround(offset = 0, pastDays = 28, futureDays = 1) {
     const dates = [];
-    const today = new Date();
-    today.setDate(today.getDate() + offset);
-    
+    const now = new Date();
+    const todayStr = this.formatDateKey(now);
+    const [y, m, d] = todayStr.split('-').map(Number);
+    const anchorUTC = Date.UTC(y, m - 1, d) + (offset * 86400000);
+
     for (let i = -pastDays; i <= futureDays; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
+      const dt = new Date(anchorUTC + (i * 86400000));
+      dates.push(this.formatDateKey(dt));
     }
     return dates;
   },
 
   formatDate(dateStr) {
-    const date = new Date(dateStr + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    const todayStr = this.formatDateKey(new Date());
+
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    const day = days[date.getDay()];
-    const month = months[date.getMonth()];
-    const dayNum = date.getDate();
-    
-    if (date.getTime() === today.getTime()) {
-      return { day, month, dayNum, isToday: true };
-    }
-    return { day, month, dayNum, isToday: false };
+
+    const day = days[date.getUTCDay()];
+    const month = months[date.getUTCMonth()];
+    const dayNum = date.getUTCDate();
+
+    return {
+      day,
+      month,
+      dayNum,
+      isToday: dateStr === todayStr
+    };
   },
 
   // Habits view
   async renderHabits() {
+    await this.loadState();
     const grid = document.getElementById('habit-grid');
-    const showArchived = document.getElementById('show-archived-habits').checked;
-    const habits = showArchived ? this.state.habits : this.state.habits.filter(h => !h.archived);
-    
-    if (habits.length === 0) {
+    if (!grid) return;
+
+    const showArchivedEl = document.getElementById('show-archived-habits');
+    const showArchived = showArchivedEl ? showArchivedEl.checked : false;
+    const habits = (this.state && this.state.habits) || [];
+    const visibleHabits = showArchived ? habits : habits.filter(h => !h.archived);
+
+    if (visibleHabits.length === 0) {
       grid.innerHTML = '<div class="empty-state"><p>No habits yet. Add one to get started!</p></div>';
       return;
     }
 
-    const dates = this.getDatesAround(this.currentHabitDateOffset);
-    const today = new Date().toISOString().split('T')[0];
+    const dates = this.getDatesAround(this.currentHabitDateOffset || 0, 28, 1);
+    const todayStr = this.formatDateKey(new Date());
 
     let html = '<table class="calendar-table"><thead><tr>';
-    html += '<th class="habit-header">Habit</th>';
-    
+    html += '<td class="habit-header">Habit</td>';
+
     dates.forEach(date => {
       const { day, month, dayNum, isToday } = this.formatDate(date);
       const todayClass = isToday ? 'today-header' : '';
-      html += `<th class="${todayClass}">${day}<br>${month} ${dayNum}</th>`;
+      html += `<th class="day-header ${todayClass}" data-date="${date}">${day}<br>${month} ${dayNum}</th>`;
     });
     html += '</tr></thead><tbody>';
 
-    habits.forEach(habit => {
-      html += `<tr>`;
-      
-      // Habit label
+    visibleHabits.forEach(habit => {
+      const habitColor = habit.color || '#3fa34d';
       const streak = this.calculateStreak(habit.id);
-      html += `<td class="habit-label">
+
+      html += `<tr class="habit-row" data-habit-row="${habit.id}">`;
+      html += `<td class="habit-label" data-habit="${habit.id}">
         <div class="habit-label-content">
-          <span class="habit-icon">${habit.icon}</span>
+          <span class="habit-icon" style="color: ${habitColor}">${habit.icon || '●'}</span>
           <span class="habit-name">${this.escapeHtml(habit.name)}</span>
-          ${streak > 0 ? `<span class="streak-badge">${streak}</span>` : ''}
+          <span class="streak-badge">${streak}</span>
         </div>
       </td>`;
 
-      // Date cells
       dates.forEach(date => {
         const cellKey = `${habit.id}|${date}`;
-        const cell = this.state.cells[cellKey] || {};
+        const cell = (this.state.cells && this.state.cells[cellKey]) || {};
         const status = cell.status || 'empty';
-        const hasNote = !!cell.noteId;
-        const todayClass = date === today ? 'today-cell' : '';
-        
-        let statusIcon = '';
-        if (status === 'done') statusIcon = '✓';
-        else if (status === 'missed') statusIcon = '✗';
-        else if (status === 'empty') statusIcon = '';
+        const isFuture = date > todayStr;
+        const isToday = date === todayStr;
 
-        html += `<td class="${todayClass}">
-          <div class="day-cell" data-habit="${habit.id}" data-date="${date}">
+        let statusIcon = '';
+        let statusStyle = '';
+        if (status === 'done') {
+          statusIcon = '✓';
+          statusStyle = `style="background-color: ${habitColor}; border-color: ${habitColor};"`;
+        } else if (status === 'missed') {
+          statusIcon = '✗';
+        }
+
+        const cellClasses = ['day-cell'];
+        if (isFuture) cellClasses.push('disabled');
+        if (isToday) cellClasses.push('today-cell');
+
+        let noteBadgeHtml = '';
+        if (cell.noteId) {
+          const note = (this.state.notes || []).find(n => n.id === cell.noteId);
+          const noteType = (note && note.type) || 'default';
+          const tooltip = (note && note.text) ? `title="${this.escapeHtml(note.text)}"` : '';
+          noteBadgeHtml = `<div class="cell-note-badge cell-note-indicator badge-${noteType}" data-note-type="${noteType}" ${tooltip}></div>`;
+        }
+
+        html += `<td class="${isToday ? 'today-cell' : ''} ${isFuture ? 'disabled' : ''}">
+          <div class="${cellClasses.join(' ')}" data-habit="${habit.id}" data-habit-id="${habit.id}" data-date="${date}" ${isFuture ? 'disabled' : ''}>
             <div class="day-cell-content">
-              <div class="cell-status ${status}">${statusIcon}</div>
-              ${hasNote ? '<div class="cell-note-indicator"></div>' : ''}
+              <div class="cell-status ${status}" ${statusStyle}>${statusIcon}</div>
+              ${noteBadgeHtml}
             </div>
           </div>
         </td>`;
@@ -107,164 +180,131 @@ const Views = {
     html += '</tbody></table>';
     grid.innerHTML = html;
 
-    // Add click handlers
+    // Attach click and contextmenu handlers
     grid.querySelectorAll('.day-cell').forEach(cell => {
-      cell.addEventListener('click', (e) => {
+      cell.addEventListener('click', async (e) => {
         const habitId = cell.dataset.habit;
         const date = cell.dataset.date;
-        this.openCellMenu(habitId, date);
+        const currentToday = Views.formatDateKey(new Date());
+
+        // Strictly reject future dates
+        if (cell.classList.contains('disabled') || date > currentToday) {
+          return;
+        }
+
+        // Open note modal if note indicator clicked
+        if (e.target.closest('.cell-note-indicator, .cell-note-badge, .note-badge')) {
+          Views.openNoteModal(habitId, date);
+          return;
+        }
+
+        // Direct status cycle: empty -> done -> missed -> empty
+        const cellKey = `${habitId}|${date}`;
+        const cellData = (Views.state.cells && Views.state.cells[cellKey]) || {};
+        const currentStatus = cellData.status || 'empty';
+
+        let nextStatus = 'done';
+        if (currentStatus === 'done') nextStatus = 'missed';
+        else if (currentStatus === 'missed') nextStatus = 'empty';
+
+        try {
+          await API.updateCell(habitId, date, { status: nextStatus });
+          await Views.loadState();
+          await Views.renderHabits();
+        } catch (err) {
+          console.error('Error updating cell status:', err);
+        }
+      });
+
+      cell.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const habitId = cell.dataset.habit;
+        const date = cell.dataset.date;
+        Views.openNoteModal(habitId, date);
+      });
+    });
+
+    // Note badge direct click
+    grid.querySelectorAll('.cell-note-badge, .cell-note-indicator').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cell = badge.closest('.day-cell');
+        if (!cell) return;
+        const habitId = cell.dataset.habit;
+        const date = cell.dataset.date;
+        Views.openNoteModal(habitId, date);
+      });
+    });
+
+    // Habit label click to open edit modal
+    grid.querySelectorAll('.habit-label').forEach(label => {
+      label.addEventListener('click', () => {
+        const habitId = label.dataset.habit;
+        if (habitId) Views.openHabitModal(habitId);
       });
     });
   },
 
   calculateStreak(habitId) {
     let streak = 0;
-    const today = new Date();
-    
+    const now = new Date();
+    const todayStr = this.formatDateKey(now);
+    const [y, m, d] = todayStr.split('-').map(Number);
+    const todayUTC = Date.UTC(y, m - 1, d);
+
     for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dt = new Date(todayUTC - (i * 86400000));
+      const dateStr = this.formatDateKey(dt);
       const cellKey = `${habitId}|${dateStr}`;
-      const cell = this.state.cells[cellKey];
-      
+      const cell = this.state && this.state.cells && this.state.cells[cellKey];
+
       if (cell && cell.status === 'done') {
         streak++;
       } else if (cell && cell.status === 'missed') {
         break;
       } else if (i > 0) {
-        // If no data and not today, streak might still be going
-        // But if we hit a gap, break
         break;
       }
     }
-    
+
     return streak;
   },
 
   openCellMenu(habitId, date) {
-    const cellKey = `${habitId}|${date}`;
-    const cell = this.state.cells[cellKey] || {};
-    const status = cell.status || 'empty';
-    
-    // Cycle through statuses
-    let newStatus = 'done';
-    if (status === 'done') newStatus = 'missed';
-    else if (status === 'missed') newStatus = 'empty';
-    
-    // Check for long press or right click for notes
-    // For simplicity, we'll add a notes button
-    const habit = this.state.habits.find(h => h.id === habitId);
-    if (!habit) return;
-
-    // Show a simple menu
-    const menu = document.createElement('div');
-    menu.style.position = 'fixed';
-    menu.style.background = 'white';
-    menu.style.border = '1px solid #e0dfdc';
-    menu.style.borderRadius = '6px';
-    menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    menu.style.padding = '8px';
-    menu.style.zIndex = '999';
-    
-    const rect = event.target.getBoundingClientRect();
-    menu.style.left = rect.right + 8 + 'px';
-    menu.style.top = rect.top + 'px';
-    
-    menu.innerHTML = `
-      <button class="menu-item" data-action="cycle" style="display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;border-radius:4px;">
-        ${newStatus === 'done' ? '✓ Mark Done' : newStatus === 'missed' ? '✗ Mark Missed' : '○ Clear'}
-      </button>
-      ${cell.noteId ? '<button class="menu-item" data-action="view-note" style="display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;border-radius:4px;">View Note</button>' : '<button class="menu-item" data-action="add-note" style="display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;border-radius:4px;">Add Note</button>'}
-      <button class="menu-item" data-action="edit" style="display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;border-radius:4px;">Edit Habit</button>
-    `;
-    
-    document.body.appendChild(menu);
-    
-    const closeMenu = (e) => {
-      if (!menu.contains(e.target)) {
-        menu.remove();
-        document.removeEventListener('click', closeMenu);
-      }
-    };
-    
-    setTimeout(() => {
-      document.addEventListener('click', closeMenu);
-    }, 0);
-    
-    menu.querySelectorAll('.menu-item').forEach(item => {
-      item.addEventListener('mouseenter', () => {
-        item.style.background = '#f0efec';
-      });
-      item.addEventListener('mouseleave', () => {
-        item.style.background = 'none';
-      });
-    });
-    
-    menu.querySelector('[data-action="cycle"]').addEventListener('click', async () => {
-      menu.remove();
-      try {
-        await API.updateCell(habitId, date, { status: newStatus });
-        await this.loadState();
-        this.renderHabits();
-      } catch (e) {
-        alert('Error: ' + e.message);
-      }
-    });
-    
-    menu.querySelector('[data-action="add-note"], [data-action="view-note"]').addEventListener('click', () => {
-      menu.remove();
-      this.openNoteModal(habitId, date);
-    });
-    
-    menu.querySelector('[data-action="edit"]').addEventListener('click', () => {
-      menu.remove();
-      this.openHabitModal(habitId);
-    });
+    this.openNoteModal(habitId, date);
   },
 
   openNoteModal(habitId, date) {
     const cellKey = `${habitId}|${date}`;
-    const cell = this.state.cells[cellKey] || {};
-    const note = cell.noteId ? this.state.notes.find(n => n.id === cell.noteId) : null;
-    
+    const cell = (this.state && this.state.cells && this.state.cells[cellKey]) || {};
+    const note = cell.noteId ? (this.state.notes || []).find(n => n.id === cell.noteId) : null;
+
     const modal = document.getElementById('note-modal');
+    if (!modal) return;
     const content = modal.querySelector('.note-modal-content');
     const title = document.getElementById('note-modal-title');
     const textArea = document.getElementById('note-text');
     const deleteBtn = document.getElementById('delete-note-btn');
-    
-    title.textContent = note ? 'Edit Note' : 'Add Note';
-    textArea.value = note ? note.text : '';
-    deleteBtn.style.display = note ? 'inline-flex' : 'none';
-    
-    // Set note type
-    const type = note ? note.type : 'default';
+
+    if (title) title.textContent = note ? 'Edit Note' : 'Add Note';
+    if (textArea) textArea.value = note ? (note.text || '') : '';
+    if (deleteBtn) deleteBtn.style.display = note ? 'inline-flex' : 'none';
+
+    const type = note ? (note.type || 'default') : 'default';
     modal.querySelectorAll('.note-type-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.type === type);
     });
-    
-    // Apply styling
-    content.className = 'modal-content note-modal-content';
-    if (type === 'love') content.classList.add('note-type-love');
-    else if (type === 'discipline') content.classList.add('note-type-discipline');
-    
+
+    if (content) {
+      content.className = 'modal-content note-modal-content';
+      if (type === 'love') content.classList.add('note-type-love');
+      else if (type === 'discipline') content.classList.add('note-type-discipline');
+    }
+
     modal.style.display = 'flex';
     modal.dataset.habitId = habitId;
     modal.dataset.date = date;
     modal.dataset.noteId = note ? note.id : '';
-    
-    // Note type handlers
-    modal.querySelectorAll('.note-type-btn').forEach(btn => {
-      btn.onclick = () => {
-        modal.querySelectorAll('.note-type-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        content.className = 'modal-content note-modal-content';
-        if (btn.dataset.type === 'love') content.classList.add('note-type-love');
-        else if (btn.dataset.type === 'discipline') content.classList.add('note-type-discipline');
-      };
-    });
   },
 
   openHabitModal(habitId = null) {
@@ -275,15 +315,15 @@ const Views = {
     const colorInput = document.getElementById('habit-color');
     const archiveBtn = document.getElementById('archive-habit-btn');
     const deleteBtn = document.getElementById('delete-habit-btn');
-    
+
     if (habitId) {
       const habit = this.state.habits.find(h => h.id === habitId);
       if (!habit) return;
-      
+
       title.textContent = 'Edit Habit';
       nameInput.value = habit.name;
       iconInput.value = habit.icon;
-      colorInput.value = habit.color;
+      colorInput.value = habit.color || '#3fa34d';
       archiveBtn.style.display = 'inline-flex';
       archiveBtn.textContent = habit.archived ? 'Unarchive' : 'Archive';
       deleteBtn.style.display = 'inline-flex';
@@ -297,7 +337,7 @@ const Views = {
       deleteBtn.style.display = 'none';
       modal.dataset.habitId = '';
     }
-    
+
     modal.style.display = 'flex';
   },
 
@@ -491,18 +531,6 @@ const Views = {
     try {
       const diary = await API.getDiary(this.currentDiaryDate);
       
-      // Quote
-      const quoteSection = document.getElementById('quote-section');
-      const quotes = this.state.quotes;
-      if (quotes.length > 0) {
-        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-        document.getElementById('quote-text').textContent = `"${randomQuote.text}"`;
-        document.getElementById('quote-author').textContent = `— ${randomQuote.author || 'Unknown'}`;
-        quoteSection.style.display = 'block';
-      } else {
-        quoteSection.style.display = 'none';
-      }
-      
       // Entry
       document.getElementById('diary-entry').value = diary.entry || '';
       
@@ -610,6 +638,7 @@ const Views = {
             await API.deleteQuote(btn.dataset.id);
             await this.loadState();
             this.renderSettings();
+            this.renderTopQuote(true);
           }
         });
       });
@@ -619,8 +648,12 @@ const Views = {
   },
 
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 };

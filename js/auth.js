@@ -11,11 +11,6 @@ const Auth = {
     const pinPad = document.getElementById('pin-pad-container');
     const toggleToPassword = document.getElementById('use-password-link');
     const toggleToPin = document.getElementById('use-pin-link');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => this.lockApp());
-    }
 
     if (form) {
       form.addEventListener('submit', async (e) => {
@@ -76,6 +71,7 @@ const Auth = {
 
       if (!status.passwordSet) {
         // Initial first-time setup
+        document.title = 'Hobby Tracker (Locked)';
         subtitle.textContent = 'Create your master password & PIN';
         confirmGroup.style.display = 'block';
         if (pinSetupGroup) pinSetupGroup.style.display = 'block';
@@ -90,10 +86,13 @@ const Auth = {
 
         if (Storage.isUnlocked()) {
           this.showApp();
-        } else if (this.hasPin) {
-          this.showPinPad();
         } else {
-          this.showPasswordForm();
+          document.title = 'Hobby Tracker (Locked)';
+          if (this.hasPin) {
+            this.showPinPad();
+          } else {
+            this.showPasswordForm();
+          }
         }
       }
     } catch (e) {
@@ -215,6 +214,7 @@ const Auth = {
 
   lockApp() {
     Storage.lock();
+    document.title = 'Hobby Tracker (Locked)';
     document.getElementById('app').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('password').value = '';

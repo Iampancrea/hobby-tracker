@@ -3,13 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="application-name" content="Hobby Tracker">
   <meta name="theme-color" content="#3fa34d">
+  <meta name="msapplication-TileColor" content="#3fa34d">
+  <meta name="msapplication-TileImage" content="./icons/icon-192.png">
+  <meta name="msapplication-config" content="none">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Hobby Tracker</title>
   <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="alternate" type="application/json" href="./manifest.json" title="Web App Manifest">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
   <link rel="stylesheet" href="./css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -127,14 +134,24 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button id="lock-btn" class="btn btn-secondary btn-small" title="Lock App">🔒 Lock</button>
-        <button id="logout-btn" class="btn btn-secondary btn-small">Exit</button>
+        <button id="lock-btn" class="btn btn-secondary btn-small" title="Lock Vault">🔒 Lock Vault</button>
       </div>
     </aside>
 
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <main class="main-content">
+      <!-- Top Quote Banner (Permanent across all views) -->
+      <header id="top-quote-banner" class="top-quote-banner" style="display:none;">
+        <div class="top-quote-content">
+          <span class="quote-mark" aria-hidden="true">“</span>
+          <div class="top-quote-body">
+            <blockquote id="quote-text" class="top-quote-text"></blockquote>
+            <cite id="quote-author" class="top-quote-author"></cite>
+          </div>
+        </div>
+      </header>
+
       <!-- Habits View -->
       <div id="view-habits" class="view active">
         <div class="view-header">
@@ -198,10 +215,6 @@
           </div>
         </div>
         <div class="diary-content">
-          <div class="quote-section" id="quote-section">
-            <blockquote id="quote-text"></blockquote>
-            <cite id="quote-author"></cite>
-          </div>
           <div class="diary-section">
             <h3>Today's Entry</h3>
             <textarea id="diary-entry" placeholder="How was your day? What did you learn? What are you grateful for?"></textarea>

@@ -271,6 +271,16 @@ const Storage = {
     return cleaned;
   },
 
+  _sanitizeColor(color) {
+    if (!color || typeof color !== 'string') return '#3fa34d';
+    color = color.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+    if (/^#[0-9a-fA-F]{3}$/.test(color)) {
+      return '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+    }
+    return '#3fa34d';
+  },
+
   // Habits
   async createHabit(habitData) {
     const state = await this.getState();
@@ -279,7 +289,7 @@ const Storage = {
       id: 'h_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
       name: habitData.name,
       icon: habitData.icon || '●',
-      color: habitData.color || '#3fa34d',
+      color: this._sanitizeColor(habitData.color),
       archived: false,
       createdAt: now,
       updatedAt: now
@@ -293,23 +303,53 @@ const Storage = {
     const state = await this.getState();
     const habit = state.habits.find(h => h.id === id);
     if (!habit) throw new Error('Habit not found');
-    Object.assign(habit, updates, { updatedAt: new Date().toISOString() });
+    const cleanUpdates = { ...updates };
+    if ('color' in cleanUpdates) {
+      cleanUpdates.color = this._sanitizeColor(cleanUpdates.color);
+    }
+    Object.assign(habit, cleanUpdates, { updatedAt: new Date().toISOString() });
     await this.saveRawState(state);
     return habit;
   },
 
   async deleteHabit(id) {
     const state = await this.getState();
-    state.habits = state.habits.filter(h => h.id !== id);
+    const now = new Date().toISOString();
+    state.habits = (state.habits || []).filter(h => h.id !== id);
     if (!state.tombstones) state.tombstones = {};
     if (!state.tombstones.habits) state.tombstones.habits = {};
-    state.tombstones.habits[id] = new Date().toISOString();
+    state.tombstones.habits[id] = now;
+
+    // Purge or tombstone associated notes
+    if (state.notes) {
+      if (!state.tombstones.notes) state.tombstones.notes = {};
+      const habitNotes = state.notes.filter(n => n.habitId === id);
+      for (const n of habitNotes) {
+        state.tombstones.notes[n.id] = now;
+      }
+      state.notes = state.notes.filter(n => n.habitId !== id);
+    }
+
+    // Clean up habit cells
+    if (state.cells) {
+      for (const key of Object.keys(state.cells)) {
+        if (key.startsWith(`${id}|`)) {
+          delete state.cells[key];
+        }
+      }
+    }
+
     await this.saveRawState(state);
     return { success: true };
   },
 
   // Cells
   async updateCell(habitId, date, updates) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date > todayStr && updates && updates.status && updates.status !== 'empty') {
+      throw new Error('Cannot set status for future dates');
+    }
+
     const state = await this.getState();
     if (!state.cells) state.cells = {};
     const key = `${habitId}|${date}`;
@@ -324,6 +364,14 @@ const Storage = {
     state.cells[key] = updated;
     await this.saveRawState(state);
     return updated;
+  },
+
+  async setHabitStatus(habitId, date, status) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date > todayStr && status && status !== 'empty') {
+      throw new Error('Cannot set status for future dates');
+    }
+    return this.updateCell(habitId, date, { status });
   },
 
   async deleteCell(habitId, date) {
@@ -342,12 +390,27 @@ const Storage = {
     const now = new Date().toISOString();
     const note = {
       id: 'n_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      habitId: noteData.habitId || null,
+      date: noteData.date || null,
       type: noteData.type || 'default',
       text: noteData.text || '',
       createdAt: now,
       updatedAt: now
     };
     state.notes.push(note);
+
+    // Link note.id to corresponding cell
+    if (noteData.habitId && noteData.date) {
+      if (!state.cells) state.cells = {};
+      const cellKey = `${noteData.habitId}|${noteData.date}`;
+      const existing = state.cells[cellKey] || { habitId: noteData.habitId, date: noteData.date, status: 'empty' };
+      state.cells[cellKey] = {
+        ...existing,
+        noteId: note.id,
+        updatedAt: now
+      };
+    }
+
     await this.saveRawState(state);
     return note;
   },
@@ -363,12 +426,32 @@ const Storage = {
 
   async deleteNote(id) {
     const state = await this.getState();
+    const note = (state.notes || []).find(n => n.id === id);
     state.notes = (state.notes || []).filter(n => n.id !== id);
     if (!state.tombstones) state.tombstones = {};
     if (!state.tombstones.notes) state.tombstones.notes = {};
     state.tombstones.notes[id] = new Date().toISOString();
+
+    // Clear noteId from state.cells
+    if (state.cells) {
+      for (const key of Object.keys(state.cells)) {
+        if (state.cells[key] && state.cells[key].noteId === id) {
+          delete state.cells[key].noteId;
+          state.cells[key].updatedAt = new Date().toISOString();
+        }
+      }
+    }
+
     await this.saveRawState(state);
     return { success: true };
+  },
+
+  async getNotes(habitId = null, date = null) {
+    const state = await this.getState();
+    let notes = state.notes || [];
+    if (habitId) notes = notes.filter(n => n.habitId === habitId);
+    if (date) notes = notes.filter(n => n.date === date);
+    return notes;
   },
 
   // Tasks

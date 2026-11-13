@@ -1,9 +1,17 @@
 // Main app module for Hobby Tracker PWA
 const App = {
   currentViewName: 'habits',
+  initialized: false,
 
   async init() {
     await Views.loadState();
+    Views.renderTopQuote();
+
+    if (this.initialized) {
+      this.refreshCurrentView();
+      return;
+    }
+    this.initialized = true;
 
     // Register Service Worker for 100% Offline Support
     if ('serviceWorker' in navigator) {
@@ -18,6 +26,7 @@ const App = {
       if (status === 'synced') {
         // Automatically refresh active views when changes arrive from other device
         await Views.loadState();
+        Views.renderTopQuote(true);
         this.refreshCurrentView();
       }
     });
@@ -290,6 +299,7 @@ const App = {
         document.getElementById('new-quote-author').value = '';
         await Views.loadState();
         Views.renderSettings();
+        Views.renderTopQuote(true);
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -346,10 +356,17 @@ const App = {
     });
 
     // Note Modal
+    const noteModal = document.getElementById('note-modal');
+    const noteContent = noteModal ? noteModal.querySelector('.note-modal-content') : null;
     document.querySelectorAll('#note-modal .note-type-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#note-modal .note-type-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        if (noteContent) {
+          noteContent.className = 'modal-content note-modal-content';
+          if (btn.dataset.type === 'love') noteContent.classList.add('note-type-love');
+          else if (btn.dataset.type === 'discipline') noteContent.classList.add('note-type-discipline');
+        }
       });
     });
 
@@ -359,7 +376,8 @@ const App = {
       const date = modal.dataset.date;
       const noteId = modal.dataset.noteId;
       const text = document.getElementById('note-text').value.trim();
-      const type = modal.querySelector('.note-type-btn.active').dataset.type;
+      const activeBtn = modal.querySelector('.note-type-btn.active');
+      const type = (activeBtn && activeBtn.dataset.type) || 'default';
 
       try {
         if (noteId) {
@@ -369,7 +387,7 @@ const App = {
         }
         modal.style.display = 'none';
         await Views.loadState();
-        Views.renderHabits();
+        await Views.renderHabits();
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -557,6 +575,20 @@ const App = {
     document.querySelectorAll('.view').forEach(v => {
       v.classList.toggle('active', v.id === `view-${view}`);
     });
+
+    // Dynamic Document Title for Task Manager & Desktop Shell
+    const titles = {
+      habits: 'Habits — Hobby Tracker',
+      tasks: 'Tasks — Hobby Tracker',
+      diary: 'Diary — Hobby Tracker',
+      settings: 'Settings — Hobby Tracker'
+    };
+    document.title = titles[view] || 'Hobby Tracker';
+
+    // Keep top quote banner visible across all view changes
+    if (typeof Views.renderTopQuote === 'function') {
+      Views.renderTopQuote();
+    }
 
     if (view === 'habits') Views.renderHabits();
     else if (view === 'tasks') Views.renderTasks();

@@ -178,14 +178,14 @@
         </div>
       </div>
 
-      <!-- Tasks View -->
+      <!-- Tasks View (Dedicated Checklist) -->
       <div id="view-tasks" class="view">
         <div class="view-header">
-          <h1>Calendar Tasks</h1>
-          <div class="view-controls">
-            <button id="prev-week-tasks" class="btn btn-icon" title="Previous week">◀</button>
-            <button id="today-btn-tasks" class="btn btn-small">Today</button>
-            <button id="next-week-tasks" class="btn btn-icon" title="Next week">▶</button>
+          <h1>Tasks</h1>
+          <div class="task-filter-group">
+            <button type="button" class="task-filter-btn active" data-filter="all">All</button>
+            <button type="button" class="task-filter-btn" data-filter="active">Active</button>
+            <button type="button" class="task-filter-btn" data-filter="completed">Completed</button>
           </div>
         </div>
         <div class="task-controls">
@@ -195,50 +195,69 @@
             <span>Show archived</span>
           </label>
         </div>
-        <div class="task-grid-container">
-          <div class="task-grid" id="task-grid">
-            <div class="empty-state">
-              <p>No tasks yet. Add one to get started!</p>
+        <div id="task-grid" class="tasks-checklist-container">
+          <div id="tasks-checklist" class="tasks-checklist">
+            <div id="tasks-empty-state" class="empty-state">
+              <p>No tasks yet. Add one above!</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Diary View -->
+      <!-- Diary View (With Left Calendar Navigation Sidebar) -->
       <div id="view-diary" class="view">
-        <div class="view-header">
-          <h1>Daily Diary</h1>
-          <div class="date-picker">
-            <button id="prev-day" class="btn btn-icon">◀</button>
-            <input type="date" id="diary-date">
-            <button id="next-day" class="btn btn-icon">▶</button>
-          </div>
-        </div>
-        <div class="diary-content">
-          <div class="diary-section">
-            <h3>Today's Entry</h3>
-            <textarea id="diary-entry" placeholder="How was your day? What did you learn? What are you grateful for?"></textarea>
-          </div>
-          <div class="diary-section">
-            <h3>Today's Tasks</h3>
-            <div id="diary-tasks" class="diary-tasks-list">
-              <div class="empty-state">
-                <p>No tasks for today. Add one below.</p>
+        <div class="diary-layout-container">
+          <!-- Diary Left Sidebar Calendar -->
+          <aside class="diary-sidebar" id="diary-sidebar-calendar">
+            <div class="diary-calendar-nav">
+              <button type="button" id="diary-prev-month" class="btn btn-icon btn-small" title="Previous month">◀</button>
+              <div class="diary-month-year-picker">
+                <select id="diary-month-select" class="diary-select" aria-label="Select month"></select>
+                <select id="diary-year-select" class="diary-select" aria-label="Select year"></select>
+              </div>
+              <button type="button" id="diary-next-month" class="btn btn-icon btn-small" title="Next month">▶</button>
+            </div>
+            <div id="diary-mini-calendar" class="diary-mini-calendar"></div>
+            <button type="button" id="diary-jump-today-btn" class="btn btn-secondary btn-small btn-block" style="margin-top:10px;">Today</button>
+          </aside>
+
+          <!-- Main Diary Area -->
+          <div class="diary-main-content">
+            <div class="view-header">
+              <h1>Daily Diary</h1>
+              <div class="date-picker">
+                <button type="button" id="prev-day" class="btn btn-icon">◀</button>
+                <input type="date" id="diary-date">
+                <button type="button" id="next-day" class="btn btn-icon">▶</button>
               </div>
             </div>
-            <div class="add-diary-task">
-              <input type="text" id="new-diary-task" placeholder="Add a task for today...">
-              <button id="add-diary-task-btn" class="btn btn-primary btn-small">Add</button>
-            </div>
-          </div>
-          <div class="diary-section">
-            <h3>Mood</h3>
-            <div class="mood-selector" id="mood-selector">
-              <button class="mood-btn" data-mood="great">😄 Great</button>
-              <button class="mood-btn" data-mood="good">🙂 Good</button>
-              <button class="mood-btn" data-mood="okay">😐 Okay</button>
-              <button class="mood-btn" data-mood="bad">😕 Bad</button>
-              <button class="mood-btn" data-mood="terrible">😢 Terrible</button>
+            <div class="diary-content">
+              <div class="diary-section">
+                <h3>Today's Entry</h3>
+                <textarea id="diary-entry" placeholder="How was your day? What did you learn? What are you grateful for?"></textarea>
+              </div>
+              <div class="diary-section">
+                <h3>Today's Tasks</h3>
+                <div id="diary-tasks" class="diary-tasks-list">
+                  <div class="empty-state">
+                    <p>No tasks for today. Add one below.</p>
+                  </div>
+                </div>
+                <div class="add-diary-task">
+                  <input type="text" id="new-diary-task" placeholder="Add a task for today...">
+                  <button type="button" id="add-diary-task-btn" class="btn btn-primary btn-small">Add</button>
+                </div>
+              </div>
+              <div class="diary-section">
+                <h3>Mood</h3>
+                <div class="mood-selector" id="mood-selector">
+                  <button type="button" class="mood-btn" data-mood="great">😄 Great</button>
+                  <button type="button" class="mood-btn" data-mood="good">🙂 Good</button>
+                  <button type="button" class="mood-btn" data-mood="okay">😐 Okay</button>
+                  <button type="button" class="mood-btn" data-mood="bad">😕 Bad</button>
+                  <button type="button" class="mood-btn" data-mood="terrible">😢 Terrible</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

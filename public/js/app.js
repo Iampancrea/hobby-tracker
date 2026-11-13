@@ -106,47 +106,135 @@ const App = {
     });
 
     // Tasks view controls
-    document.getElementById('prev-week-tasks').addEventListener('click', () => {
-      Views.currentTaskDateOffset -= 7;
-      Views.renderTasks();
-    });
+    const prevWeekTasks = document.getElementById('prev-week-tasks');
+    if (prevWeekTasks) {
+      prevWeekTasks.addEventListener('click', () => {
+        Views.currentTaskDateOffset -= 7;
+        Views.renderTasks();
+      });
+    }
 
-    document.getElementById('next-week-tasks').addEventListener('click', () => {
-      Views.currentTaskDateOffset += 7;
-      Views.renderTasks();
-    });
+    const nextWeekTasks = document.getElementById('next-week-tasks');
+    if (nextWeekTasks) {
+      nextWeekTasks.addEventListener('click', () => {
+        Views.currentTaskDateOffset += 7;
+        Views.renderTasks();
+      });
+    }
 
-    document.getElementById('today-btn-tasks').addEventListener('click', () => {
-      Views.currentTaskDateOffset = 0;
-      Views.renderTasks();
-    });
+    const todayBtnTasks = document.getElementById('today-btn-tasks');
+    if (todayBtnTasks) {
+      todayBtnTasks.addEventListener('click', () => {
+        Views.currentTaskDateOffset = 0;
+        Views.renderTasks();
+      });
+    }
 
-    document.getElementById('add-task-btn').addEventListener('click', () => {
-      Views.openTaskModal();
-    });
+    const addTaskBtn = document.getElementById('add-task-btn');
+    if (addTaskBtn) {
+      addTaskBtn.addEventListener('click', () => {
+        Views.openTaskModal();
+      });
+    }
 
-    document.getElementById('show-archived-tasks').addEventListener('change', () => {
-      Views.renderTasks();
+    const showArchivedTasks = document.getElementById('show-archived-tasks');
+    if (showArchivedTasks) {
+      showArchivedTasks.addEventListener('change', () => {
+        Views.renderTasks();
+      });
+    }
+
+    // Task filter controls
+    document.querySelectorAll('.task-filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.task-filter-btn').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        Views.currentTaskFilter = e.currentTarget.getAttribute('data-filter') || 'all';
+        Views.renderTasks();
+      });
     });
 
     // Diary view controls
-    document.getElementById('diary-date').addEventListener('change', (e) => {
-      Views.currentDiaryDate = e.target.value;
-      Views.renderDiary();
-    });
+    const diaryDateInput = document.getElementById('diary-date');
+    if (diaryDateInput) {
+      diaryDateInput.addEventListener('change', (e) => {
+        if (e.target.value) {
+          Views.currentDiaryDate = e.target.value;
+          const [y, m] = e.target.value.split('-').map(Number);
+          Views.diaryNavYear = y;
+          Views.diaryNavMonth = m - 1;
+          Views.renderDiary();
+        }
+      });
+    }
 
-    document.getElementById('prev-day').addEventListener('click', () => {
-      const date = new Date(Views.currentDiaryDate);
-      date.setDate(date.getDate() - 1);
-      Views.currentDiaryDate = date.toISOString().split('T')[0];
-      Views.renderDiary();
-    });
+    const prevDayBtn = document.getElementById('prev-day');
+    if (prevDayBtn) {
+      prevDayBtn.addEventListener('click', () => {
+        const [y, m, d] = Views.currentDiaryDate.split('-').map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d - 1));
+        const nextY = dt.getUTCFullYear();
+        const nextM = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        const nextD = String(dt.getUTCDate()).padStart(2, '0');
+        Views.currentDiaryDate = `${nextY}-${nextM}-${nextD}`;
+        Views.diaryNavYear = nextY;
+        Views.diaryNavMonth = dt.getUTCMonth();
+        const dInput = document.getElementById('diary-date');
+        if (dInput) dInput.value = Views.currentDiaryDate;
+        Views.renderDiary();
+      });
+    }
 
-    document.getElementById('next-day').addEventListener('click', () => {
-      const date = new Date(Views.currentDiaryDate);
-      date.setDate(date.getDate() + 1);
-      Views.currentDiaryDate = date.toISOString().split('T')[0];
-      Views.renderDiary();
+    const nextDayBtn = document.getElementById('next-day');
+    if (nextDayBtn) {
+      nextDayBtn.addEventListener('click', () => {
+        const [y, m, d] = Views.currentDiaryDate.split('-').map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d + 1));
+        const nextY = dt.getUTCFullYear();
+        const nextM = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        const nextD = String(dt.getUTCDate()).padStart(2, '0');
+        Views.currentDiaryDate = `${nextY}-${nextM}-${nextD}`;
+        Views.diaryNavYear = nextY;
+        Views.diaryNavMonth = dt.getUTCMonth();
+        const dInput = document.getElementById('diary-date');
+        if (dInput) dInput.value = Views.currentDiaryDate;
+        Views.renderDiary();
+      });
+    }
+
+    // Mood selector buttons
+    document.querySelectorAll('.mood-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const clickedBtn = e.currentTarget;
+        const mood = clickedBtn.dataset.mood;
+        const date = Views.currentDiaryDate || (document.getElementById('diary-date') ? document.getElementById('diary-date').value : new Date().toISOString().split('T')[0]);
+
+        const wasActive = clickedBtn.classList.contains('active');
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+        const newMood = wasActive ? null : mood;
+        if (!wasActive) {
+          clickedBtn.classList.add('active');
+        }
+
+        if (Views.state) {
+          if (!Views.state.diary) Views.state.diary = {};
+          if (!Views.state.diary[date]) Views.state.diary[date] = { entry: '', tasks: [], mood: null };
+          Views.state.diary[date].mood = newMood;
+          Views.state.diary[date].updatedAt = new Date().toISOString();
+          Storage.saveRawState(Views.state);
+        } else {
+          try {
+            const diary = await API.getDiary(date);
+            diary.mood = newMood;
+            await API.saveDiary(date, diary);
+          } catch (err) {
+            console.error('Error saving mood:', err);
+          }
+        }
+        if (Views.renderDiaryMiniCalendar) {
+          Views.renderDiaryMiniCalendar();
+        }
+      });
     });
 
     document.getElementById('diary-entry').addEventListener('blur', async () => {

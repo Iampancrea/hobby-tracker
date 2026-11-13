@@ -168,10 +168,11 @@ const Auth = {
     const confirmGroup = document.getElementById('confirm-password-group');
 
     this.clearError();
-    const isSetup = confirmGroup.style.display !== 'none';
+    const setupStatus = await Storage.checkSetup();
+    const isSetup = !setupStatus.passwordSet || (confirmGroup && confirmGroup.style.display !== 'none');
 
     if (isSetup) {
-      if (password !== confirm) {
+      if (confirm && password !== confirm) {
         this.showError('Passwords do not match');
         return;
       }

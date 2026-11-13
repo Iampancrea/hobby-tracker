@@ -96,8 +96,11 @@ const Storage = {
   },
 
   async saveRawState(state) {
-    await this.init();
     state.lastModifiedAt = new Date().toISOString();
+    if (this.db && this.db._stores && this.db._stores.get('state')) {
+      this.db._stores.get('state').set('main', structuredClone(state));
+    }
+    await this.init();
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('state', 'readwrite');
       const store = tx.objectStore('state');
@@ -138,9 +141,11 @@ const Storage = {
 
     let pinHash = null;
     let pinSalt = null;
+    let wrappedMasterKey = null;
     if (pin && pin.length >= 4) {
       pinSalt = CryptoUtils.generateSalt(16);
       pinHash = await CryptoUtils.sha256(pin, pinSalt);
+      wrappedMasterKey = await CryptoUtils.encrypt({ masterPassword }, pin, pinSalt);
     }
 
     const authData = {
@@ -148,6 +153,7 @@ const Storage = {
       masterSalt,
       pinHash,
       pinSalt,
+      wrappedMasterKey,
       configuredAt: new Date().toISOString()
     };
 
@@ -180,7 +186,19 @@ const Storage = {
       throw new Error('Incorrect PIN');
     }
 
-    await this.setUnlocked(true);
+    let masterPassword = null;
+    if (auth.wrappedMasterKey) {
+      try {
+        const unwrapped = await CryptoUtils.decrypt(auth.wrappedMasterKey, pin);
+        if (unwrapped && unwrapped.masterPassword) {
+          masterPassword = unwrapped.masterPassword;
+        }
+      } catch (e) {
+        console.warn('Could not unwrap master key from PIN:', e);
+      }
+    }
+
+    await this.setUnlocked(true, masterPassword);
     return { success: true };
   },
 
@@ -224,10 +242,15 @@ const Storage = {
     if (!pin) {
       auth.pinHash = null;
       auth.pinSalt = null;
+      auth.wrappedMasterKey = null;
     } else {
       if (pin.length < 4) throw new Error('PIN must be at least 4 digits');
       auth.pinSalt = CryptoUtils.generateSalt(16);
       auth.pinHash = await CryptoUtils.sha256(pin, auth.pinSalt);
+      const masterPassword = this.getMasterPassword();
+      if (masterPassword) {
+        auth.wrappedMasterKey = await CryptoUtils.encrypt({ masterPassword }, pin, auth.pinSalt);
+      }
     }
     await this.setKV('auth', auth);
     return { success: true };
@@ -462,14 +485,19 @@ const Storage = {
     const task = {
       id: 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
       title: taskData.title,
-      archived: false,
+      status: taskData.status || 'pending',
+      archived: !!taskData.archived,
       createdAt: now,
       updatedAt: now,
-      history: {}
+      history: taskData.history || {}
     };
     state.tasks.push(task);
     await this.saveRawState(state);
     return task;
+  },
+
+  async setTaskStatus(id, status) {
+    return this.updateTask(id, { status });
   },
 
   async updateTask(id, updates) {

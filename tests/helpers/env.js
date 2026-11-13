@@ -684,6 +684,14 @@ function matchCompound(el, sel) {
     remaining = remaining.replace(idMatch[0], '');
   }
 
+  // Match :not(...)
+  const notMatches = remaining.matchAll(/:not\(([^)]+)\)/g);
+  for (const nm of notMatches) {
+    const innerSel = nm[1].trim();
+    if (matchCompound(el, innerSel)) return false;
+  }
+  remaining = remaining.replace(/:not\([^)]+\)/g, '');
+
   // Match .classes
   const classMatches = remaining.matchAll(/\.([a-zA-Z0-9_-]+)/g);
   for (const cm of classMatches) {
@@ -1276,7 +1284,10 @@ async function bootApp(options = {}) {
         if (form) form.dispatchEvent(new MockEvent('submit', { bubbles: true, cancelable: true }));
       }
 
-      await new Promise(r => setTimeout(r, 20));
+      for (let i = 0; i < 30; i++) {
+        if (win.Storage && win.Storage.isUnlocked()) break;
+        await new Promise(r => setTimeout(r, 10));
+      }
     },
 
     switchView(viewName) {

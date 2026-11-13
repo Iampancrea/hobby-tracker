@@ -1262,3 +1262,258 @@ input, textarea {
   background: var(--text-muted);
 }
 
+/* === DIARY SPLIT LAYOUT & MINI CALENDAR === */
+.diary-layout-container {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.diary-sidebar {
+  width: 280px;
+  min-width: 260px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.diary-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.diary-month-year-picker {
+  display: flex;
+  gap: 6px;
+}
+
+.diary-select {
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.diary-mini-calendar {
+  width: 100%;
+}
+
+.mini-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.mini-cal-day-name {
+  padding: 4px 0;
+}
+
+.mini-cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.mini-cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.mini-cal-day:hover:not(.empty) {
+  background: var(--surface-alt);
+}
+
+.mini-cal-day.empty {
+  cursor: default;
+}
+
+.mini-cal-day.today {
+  font-weight: bold;
+  color: var(--primary);
+  background: rgba(63, 163, 77, 0.1);
+}
+
+.mini-cal-day.selected {
+  background: var(--primary) !important;
+  color: #fff !important;
+  font-weight: bold;
+}
+
+.mini-cal-day.has-entry::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.mini-cal-day.selected.has-entry::after {
+  background: #fff;
+}
+
+.diary-main-content {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .diary-layout-container {
+    flex-direction: column;
+  }
+  .diary-sidebar {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* === TASKS CHECKLIST VIEW === */
+.task-filter-group {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-alt);
+  padding: 3px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.task-filter-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.task-filter-btn:hover {
+  color: var(--text);
+}
+
+.task-filter-btn.active {
+  background: var(--surface);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.tasks-checklist-container {
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  min-height: 200px;
+}
+
+.tasks-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.task-item:hover {
+  background: var(--surface-alt);
+  border-color: var(--primary-light, #c8e6c9);
+}
+
+.task-item.done {
+  opacity: 0.65;
+  background: var(--surface-alt);
+}
+
+.task-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.task-title {
+  font-size: 14px;
+  color: var(--text);
+  word-break: break-word;
+  transition: all 0.15s ease;
+}
+
+.task-title.completed {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.task-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.task-archive-btn,
+.task-delete-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.task-archive-btn:hover,
+.task-delete-btn:hover {
+  opacity: 1;
+}
+
+.task-delete-btn {
+  color: var(--danger, #e53935);
+  font-size: 16px;
+  line-height: 1;
+}
+
+

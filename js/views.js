@@ -114,7 +114,7 @@ const Views = {
     const todayStr = this.formatDateKey(new Date());
 
     let html = '<table class="calendar-table"><thead><tr>';
-    html += '<td class="habit-header">Habit</td>';
+    html += '<th class="habit-header">Habit</th>';
 
     dates.forEach(date => {
       const { day, month, dayNum, isToday } = this.formatDate(date);
@@ -341,192 +341,291 @@ const Views = {
     modal.style.display = 'flex';
   },
 
-  // Tasks view
+  currentTaskFilter: 'all', // 'all' | 'active' | 'completed'
+
+  // Tasks view (Dedicated Checklist)
   async renderTasks() {
-    const grid = document.getElementById('task-grid');
-    const showArchived = document.getElementById('show-archived-tasks').checked;
-    const tasks = showArchived ? this.state.tasks : this.state.tasks.filter(t => !t.archived);
-    
+    const container = document.getElementById('tasks-checklist') || document.getElementById('task-grid');
+    if (!container) return;
+
+    await this.loadState();
+    const showArchived = document.getElementById('show-archived-tasks')?.checked || false;
+    let tasks = (this.state && this.state.tasks) ? [...this.state.tasks] : [];
+    if (!showArchived) {
+      tasks = tasks.filter(t => !t.archived);
+    }
+
+    if (this.currentTaskFilter === 'active') {
+      tasks = tasks.filter(t => t.status !== 'done');
+    } else if (this.currentTaskFilter === 'completed') {
+      tasks = tasks.filter(t => t.status === 'done');
+    }
+
+    // Update filter buttons visual state
+    document.querySelectorAll('.task-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === this.currentTaskFilter);
+      btn.onclick = () => {
+        this.currentTaskFilter = btn.dataset.filter;
+        this.renderTasks();
+      };
+    });
+
     if (tasks.length === 0) {
-      grid.innerHTML = '<div class="empty-state"><p>No tasks yet. Add one to get started!</p></div>';
+      container.innerHTML = `
+        <div id="tasks-empty-state" class="empty-state">
+          <p>${this.currentTaskFilter === 'completed' ? 'No completed tasks yet.' : this.currentTaskFilter === 'active' ? 'No active tasks!' : 'No tasks yet. Add one above!'}</p>
+        </div>
+      `;
       return;
     }
 
-    const dates = this.getDatesAround(this.currentTaskDateOffset);
-    const today = new Date().toISOString().split('T')[0];
-
-    let html = '<table class="calendar-table"><thead><tr>';
-    html += '<th class="habit-header">Task</th>';
-    
-    dates.forEach(date => {
-      const { day, month, dayNum, isToday } = this.formatDate(date);
-      const todayClass = isToday ? 'today-header' : '';
-      html += `<th class="${todayClass}">${day}<br>${month} ${dayNum}</th>`;
-    });
-    html += '</tr></thead><tbody>';
-
+    let html = '';
     tasks.forEach(task => {
-      html += `<tr>`;
-      
-      // Task label
-      html += `<td class="habit-label">
-        <div class="habit-label-content">
-          <span class="habit-icon">✓</span>
-          <span class="habit-name">${this.escapeHtml(task.title)}</span>
-        </div>
-      </td>`;
-
-      // Date cells
-      dates.forEach(date => {
-        const createdDate = task.createdAt;
-        const dateBeforeCreation = date < createdDate;
-        const isDone = task.doneDates && task.doneDates.includes(date);
-        const isMissed = task.missedDates && task.missedDates.includes(date);
-        const todayClass = date === today ? 'today-cell' : '';
-        
-        let status = 'empty';
-        let statusIcon = '';
-        
-        if (dateBeforeCreation) {
-          status = 'not-existed';
-          statusIcon = '—';
-        } else if (isDone) {
-          status = 'done';
-          statusIcon = '✓';
-        } else if (isMissed) {
-          status = 'missed';
-          statusIcon = '✗';
-        }
-
-        html += `<td class="${todayClass}">
-          <div class="day-cell" data-task="${task.id}" data-date="${date}" data-before="${dateBeforeCreation}">
-            <div class="day-cell-content">
-              <div class="cell-status ${status}" title="${dateBeforeCreation ? 'Task did not exist on this date' : ''}">${statusIcon}</div>
-            </div>
+      const isDone = task.status === 'done';
+      html += `
+        <div class="task-item ${isDone ? 'done' : ''}" data-task-id="${task.id}" data-task-status="${task.status || 'pending'}">
+          <div class="task-item-left">
+            <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" ${isDone ? 'checked' : ''}>
+            <span class="task-title ${isDone ? 'completed' : ''}">${this.escapeHtml(task.title)}</span>
           </div>
-        </td>`;
-      });
-
-      html += '</tr>';
+          <div class="task-item-actions">
+            <button type="button" class="task-archive-btn" data-task-id="${task.id}" title="${task.archived ? 'Unarchive' : 'Archive'}">
+              ${task.archived ? '📂' : '📦'}
+            </button>
+            <button type="button" class="task-delete-btn" data-task-id="${task.id}" title="Delete">×</button>
+          </div>
+        </div>
+      `;
     });
+    container.innerHTML = html;
 
-    html += '</tbody></table>';
-    grid.innerHTML = html;
-
-    // Add click handlers
-    grid.querySelectorAll('.day-cell').forEach(cell => {
-      cell.addEventListener('click', (e) => {
-        const taskId = cell.dataset.task;
-        const date = cell.dataset.date;
-        const beforeCreation = cell.dataset.before === 'true';
-        if (beforeCreation) return; // Can't interact with cells before task creation
-        this.openTaskCellMenu(taskId, date);
-      });
-    });
-  },
-
-  openTaskCellMenu(taskId, date) {
-    const task = this.state.tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    const isDone = task.doneDates && task.doneDates.includes(date);
-    const isMissed = task.missedDates && task.missedDates.includes(date);
-    
-    let newStatus = 'done';
-    if (isDone) newStatus = 'missed';
-    else if (isMissed) newStatus = null;
-
-    const menu = document.createElement('div');
-    menu.style.position = 'fixed';
-    menu.style.background = 'white';
-    menu.style.border = '1px solid #e0dfdc';
-    menu.style.borderRadius = '6px';
-    menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    menu.style.padding = '8px';
-    menu.style.zIndex = '999';
-    
-    const rect = event.target.getBoundingClientRect();
-    menu.style.left = rect.right + 8 + 'px';
-    menu.style.top = rect.top + 'px';
-    
-    menu.innerHTML = `
-      <button class="menu-item" data-action="cycle" style="display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;border-radius:4px;">
-        ${newStatus === 'done' ? '✓ Mark Done' : newStatus === 'missed' ? '✗ Mark Missed' : '○ Clear'}
-      </button>
-      <button class="menu-item" data-action="edit" style="display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;border-radius:4px;">Edit Task</button>
-    `;
-    
-    document.body.appendChild(menu);
-    
-    const closeMenu = (e) => {
-      if (!menu.contains(e.target)) {
-        menu.remove();
-        document.removeEventListener('click', closeMenu);
-      }
-    };
-    
-    setTimeout(() => {
-      document.addEventListener('click', closeMenu);
-    }, 0);
-    
-    menu.querySelectorAll('.menu-item').forEach(item => {
-      item.addEventListener('mouseenter', () => {
-        item.style.background = '#f0efec';
-      });
-      item.addEventListener('mouseleave', () => {
-        item.style.background = 'none';
-      });
-    });
-    
-    menu.querySelector('[data-action="cycle"]').addEventListener('click', async () => {
-      menu.remove();
-      try {
-        await API.markTask(taskId, date, newStatus);
+    // Attach checkbox handlers
+    container.querySelectorAll('.task-checkbox').forEach(cb => {
+      const onToggle = async () => {
+        const taskId = cb.dataset.taskId;
+        const newStatus = cb.checked ? 'done' : 'pending';
+        const task = (this.state.tasks || []).find(t => t.id === taskId);
+        if (task) task.status = newStatus;
+        await API.updateTask(taskId, { status: newStatus });
         await this.loadState();
         this.renderTasks();
-      } catch (e) {
-        alert('Error: ' + e.message);
-      }
+      };
+      cb.addEventListener('change', onToggle);
     });
-    
-    menu.querySelector('[data-action="edit"]').addEventListener('click', () => {
-      menu.remove();
-      this.openTaskModal(taskId);
+
+    // Attach delete handlers
+    container.querySelectorAll('.task-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const taskId = btn.dataset.taskId;
+        await API.deleteTask(taskId);
+        await this.loadState();
+        this.renderTasks();
+      });
+    });
+
+    // Attach archive handlers
+    container.querySelectorAll('.task-archive-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const taskId = btn.dataset.taskId;
+        const task = (this.state.tasks || []).find(t => t.id === taskId);
+        if (task) {
+          await API.updateTask(taskId, { archived: !task.archived });
+          await this.loadState();
+          this.renderTasks();
+        }
+      });
     });
   },
 
   openTaskModal(taskId = null) {
     const modal = document.getElementById('task-modal');
+    if (!modal) return;
     const title = document.getElementById('task-modal-title');
     const titleInput = document.getElementById('task-title');
     const archiveBtn = document.getElementById('archive-task-btn');
     const deleteBtn = document.getElementById('delete-task-btn');
     
     if (taskId) {
-      const task = this.state.tasks.find(t => t.id === taskId);
+      const task = (this.state.tasks || []).find(t => t.id === taskId);
       if (!task) return;
       
-      title.textContent = 'Edit Task';
-      titleInput.value = task.title;
-      archiveBtn.style.display = 'inline-flex';
-      archiveBtn.textContent = task.archived ? 'Unarchive' : 'Archive';
-      deleteBtn.style.display = 'inline-flex';
+      if (title) title.textContent = 'Edit Task';
+      if (titleInput) titleInput.value = task.title;
+      if (archiveBtn) {
+        archiveBtn.style.display = 'inline-flex';
+        archiveBtn.textContent = task.archived ? 'Unarchive' : 'Archive';
+      }
+      if (deleteBtn) deleteBtn.style.display = 'inline-flex';
       modal.dataset.taskId = taskId;
     } else {
-      title.textContent = 'Add Task';
-      titleInput.value = '';
-      archiveBtn.style.display = 'none';
-      deleteBtn.style.display = 'none';
+      if (title) title.textContent = 'Add Task';
+      if (titleInput) titleInput.value = '';
+      if (archiveBtn) archiveBtn.style.display = 'none';
+      if (deleteBtn) deleteBtn.style.display = 'none';
       modal.dataset.taskId = '';
     }
     
     modal.style.display = 'flex';
   },
 
+  // Diary Calendar Sidebar Navigation
+  renderDiaryCalendarSidebar() {
+    const sidebar = document.getElementById('diary-sidebar-calendar') || document.querySelector('.diary-sidebar');
+    if (!sidebar) return;
+
+    const dateParts = this.currentDiaryDate.split('-');
+    const currentYear = parseInt(dateParts[0], 10);
+    const currentMonth = parseInt(dateParts[1], 10) - 1; // 0-indexed
+
+    if (this.diaryNavYear === undefined) this.diaryNavYear = currentYear;
+    if (this.diaryNavMonth === undefined) this.diaryNavMonth = currentMonth;
+
+    const monthSelect = document.getElementById('diary-month-select');
+    const yearSelect = document.getElementById('diary-year-select');
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const getOptionsCount = (el) => {
+      if (!el) return 0;
+      if (el.options && typeof el.options.length === 'number') return el.options.length;
+      if (el.children && typeof el.children.length === 'number') return el.children.length;
+      return (el.querySelectorAll ? el.querySelectorAll('option').length : 0);
+    };
+
+    if (monthSelect && getOptionsCount(monthSelect) === 0) {
+      monthNames.forEach((name, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = name;
+        monthSelect.appendChild(opt);
+      });
+      monthSelect.onchange = () => {
+        this.diaryNavMonth = parseInt(monthSelect.value, 10);
+        this.renderDiaryMiniCalendar();
+      };
+    }
+
+    if (yearSelect && getOptionsCount(yearSelect) === 0) {
+      for (let y = 2015; y <= 2035; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.onchange = () => {
+        this.diaryNavYear = parseInt(yearSelect.value, 10);
+        this.renderDiaryMiniCalendar();
+      };
+    }
+
+    if (monthSelect) monthSelect.value = this.diaryNavMonth;
+    if (yearSelect) yearSelect.value = this.diaryNavYear;
+
+    // Previous / Next Month button wiring
+    const prevMonthBtn = document.getElementById('diary-prev-month');
+    if (prevMonthBtn) {
+      prevMonthBtn.onclick = () => {
+        this.diaryNavMonth--;
+        if (this.diaryNavMonth < 0) {
+          this.diaryNavMonth = 11;
+          this.diaryNavYear--;
+        }
+        if (monthSelect) monthSelect.value = this.diaryNavMonth;
+        if (yearSelect) yearSelect.value = this.diaryNavYear;
+        this.renderDiaryMiniCalendar();
+      };
+    }
+
+    const nextMonthBtn = document.getElementById('diary-next-month');
+    if (nextMonthBtn) {
+      nextMonthBtn.onclick = () => {
+        this.diaryNavMonth++;
+        if (this.diaryNavMonth > 11) {
+          this.diaryNavMonth = 0;
+          this.diaryNavYear++;
+        }
+        if (monthSelect) monthSelect.value = this.diaryNavMonth;
+        if (yearSelect) yearSelect.value = this.diaryNavYear;
+        this.renderDiaryMiniCalendar();
+      };
+    }
+
+    const todayBtn = document.getElementById('diary-jump-today-btn');
+    if (todayBtn) {
+      todayBtn.onclick = () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        this.currentDiaryDate = todayStr;
+        const parts = todayStr.split('-');
+        this.diaryNavYear = parseInt(parts[0], 10);
+        this.diaryNavMonth = parseInt(parts[1], 10) - 1;
+        this.renderDiary();
+      };
+    }
+
+    this.renderDiaryMiniCalendar();
+  },
+
+  renderDiaryMiniCalendar() {
+    const miniCalendar = document.getElementById('diary-mini-calendar');
+    if (!miniCalendar) return;
+
+    const y = this.diaryNavYear;
+    const m = this.diaryNavMonth;
+    const firstDay = new Date(y, m, 1).getDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let html = '<div class="mini-cal-weekdays">';
+    ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => {
+      html += `<span class="mini-cal-day-name">${d}</span>`;
+    });
+    html += '</div><div class="mini-cal-days">';
+
+    // Empty spaces before first day of month
+    for (let i = 0; i < firstDay; i++) {
+      html += '<span class="mini-cal-day empty"></span>';
+    }
+
+    // Days of month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayStr = String(d).padStart(2, '0');
+      const monthStr = String(m + 1).padStart(2, '0');
+      const dateStr = `${y}-${monthStr}-${dayStr}`;
+      const isSelected = dateStr === this.currentDiaryDate;
+      const isToday = dateStr === todayStr;
+      const diaryData = this.state && this.state.diary && this.state.diary[dateStr];
+      const hasEntry = !!(diaryData && (diaryData.entry || diaryData.mood || (diaryData.tasks && diaryData.tasks.length > 0)));
+
+      let cls = 'mini-cal-day';
+      if (isSelected) cls += ' selected';
+      if (isToday) cls += ' today';
+      if (hasEntry) cls += ' has-entry';
+
+      html += `<button type="button" class="${cls}" data-date="${dateStr}">${d}</button>`;
+    }
+
+    html += '</div>';
+    miniCalendar.innerHTML = html;
+
+    // Attach click handlers to days
+    miniCalendar.querySelectorAll('.mini-cal-day[data-date]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.currentDiaryDate = btn.dataset.date;
+        this.renderDiary();
+      });
+    });
+  },
+
   // Diary view
   async renderDiary() {
     const dateInput = document.getElementById('diary-date');
-    dateInput.value = this.currentDiaryDate;
+    if (dateInput) dateInput.value = this.currentDiaryDate;
+
+    if (this.currentDiaryDate) {
+      const dateParts = this.currentDiaryDate.split('-');
+      this.diaryNavYear = parseInt(dateParts[0], 10);
+      this.diaryNavMonth = parseInt(dateParts[1], 10) - 1;
+    }
+    this.renderDiaryCalendarSidebar();
     
     try {
       const diary = await API.getDiary(this.currentDiaryDate);
@@ -614,8 +713,13 @@ const Views = {
     }
 
     // 3. Quotes
+    try {
+      if (!this.state && Storage.isUnlocked()) {
+        await this.loadState();
+      }
+    } catch (_) {}
     const quotesList = document.getElementById('quotes-list');
-    const quotes = this.state.quotes || [];
+    const quotes = (this.state && this.state.quotes) || [];
     
     if (quotes.length > 0) {
       let html = '';

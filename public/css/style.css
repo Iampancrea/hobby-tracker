@@ -1558,5 +1558,344 @@ input, textarea {
   margin-top: 8px;
 }
 
+/* === SIDEBAR COLLAPSE / EXPAND === */
+.sidebar-collapse-desktop {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sidebar.collapsed {
+  margin-left: -260px;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 0;
+  max-width: 100vw;
+  width: 100%;
+}
+
+.sidebar-expand-float-btn {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 99;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.sidebar-expand-float-btn:hover {
+  background: var(--surface-alt);
+  color: var(--primary);
+  transform: scale(1.05);
+}
+
+/* === DRAGGABLE NOTE TRAY UI === */
+.note-tray-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.note-tray-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-tray-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.note-tray-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.note-tray-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-tray-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  cursor: grab;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.note-tray-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.note-tray-pill.active-stamp {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(63, 163, 77, 0.3);
+}
+
+.note-tray-pill .pill-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.pill-dot.badge-default { background: var(--primary, #3fa34d); }
+.pill-dot.badge-love { background: #ec4899; }
+.pill-dot.badge-discipline { background: #f59e0b; }
+
+.cell-drop-target {
+  outline: 2px dashed var(--primary) !important;
+  outline-offset: 2px;
+  transform: scale(1.1);
+  background: rgba(63, 163, 77, 0.15) !important;
+}
+
+/* === HABIT ROW DELETE BUTTON & COMPACT GRID === */
+.habit-delete-row-btn {
+  margin-left: 6px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.4;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.habit-row:hover .habit-delete-row-btn,
+.habit-delete-row-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.calendar-table th.day-header {
+  min-width: 36px;
+  max-width: 44px;
+  padding: 6px 2px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.calendar-table th.today-header {
+  background: rgba(63, 163, 77, 0.16) !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid var(--primary);
+}
+
+.calendar-table td.today-cell {
+  background: rgba(63, 163, 77, 0.08) !important;
+}
+
+.today-badge-label {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--primary);
+  letter-spacing: 0.5px;
+  font-weight: 800;
+}
+
+/* === TOP CALENDAR BAR FOR DIARY === */
+.diary-top-calendar-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+
+.diary-top-date-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diary-date-input {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: var(--surface-alt);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* === DIARY BOOK / JOURNAL SPREAD === */
+.diary-book-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.diary-book {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  min-height: 580px;
+  background: #fdfbf7;
+  border: 1px solid #e7e2d9;
+  border-radius: 8px 14px 14px 8px;
+  box-shadow: 
+    -4px 0 0 #dcd4c8,
+    -8px 0 0 #c8bfae,
+    0 12px 35px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.04);
+  padding: 36px 42px;
+  margin: 0 auto;
+}
+
+.book-spine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 14px;
+  background: linear-gradient(to right, rgba(0,0,0,0.12), rgba(0,0,0,0.02) 80%, transparent);
+  border-radius: 8px 0 0 8px;
+  pointer-events: none;
+}
+
+.book-ribbon {
+  position: absolute;
+  top: -12px;
+  right: 48px;
+  width: 22px;
+  height: 48px;
+  background: #d94a4a;
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+}
+
+.book-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #ebe5db;
+}
+
+.book-date-title {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #2c2523;
+  letter-spacing: -0.2px;
+}
+
+.book-quote-sub {
+  display: block;
+  font-size: 13px;
+  color: #8c827a;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.book-corner-decor {
+  font-size: 22px;
+  opacity: 0.6;
+}
+
+.book-entry-section {
+  background: transparent !important;
+  padding: 0 !important;
+  margin-bottom: 24px !important;
+}
+
+.book-lined-textarea {
+  width: 100%;
+  min-height: 280px;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 32px;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #2b2b2b;
+  background: repeating-linear-gradient(
+    transparent,
+    transparent 31px,
+    #ede7dd 31px,
+    #ede7dd 32px
+  );
+  border: none;
+  outline: none;
+  resize: vertical;
+}
+
+.book-lined-textarea:focus {
+  background: repeating-linear-gradient(
+    transparent,
+    transparent 31px,
+    #e2dbcf 31px,
+    #e2dbcf 32px
+  );
+}
+
+.book-mood-section {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px dashed #ded7cc;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+}
+
+.book-mood-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #7a6f66;
+  margin-bottom: 10px;
+}
+
+
 
 

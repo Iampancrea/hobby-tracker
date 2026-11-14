@@ -102,6 +102,7 @@
           <img src="./icons/icon.svg" alt="Logo" width="24" height="24">
           <h2>Hobby Tracker</h2>
         </div>
+        <button id="sidebar-collapse-btn" class="btn btn-icon sidebar-collapse-desktop" title="Collapse sidebar">◀</button>
         <button id="sidebar-close-btn" class="btn btn-icon mobile-only" title="Close Menu">&times;</button>
       </div>
 
@@ -141,6 +142,9 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <main class="main-content">
+      <!-- Floating Sidebar Expand Button (visible when sidebar is collapsed) -->
+      <button type="button" id="sidebar-expand-btn" class="sidebar-expand-float-btn" title="Show sidebar" style="display:none;">☰</button>
+
       <!-- Top Quote Banner (Permanent across all views) -->
       <header id="top-quote-banner" class="top-quote-banner" style="display:none;">
         <div class="top-quote-content">
@@ -176,6 +180,29 @@
             <span>Show archived</span>
           </label>
         </div>
+
+        <!-- Draggable Note Tray UI Palette -->
+        <div class="note-tray-bar" id="note-tray-bar">
+          <div class="note-tray-header">
+            <span class="note-tray-title">🏷️ Note Tray:</span>
+            <span class="note-tray-desc">Drag any note badge onto a day's cell to attach a reason (e.g. out of town)</span>
+          </div>
+          <div class="note-tray-items">
+            <div class="note-tray-pill pill-default" draggable="true" data-note-type="default" title="Drag to cell or click to stamp">
+              <span class="pill-dot badge-default"></span>
+              <span class="pill-name">Default Note 📝</span>
+            </div>
+            <div class="note-tray-pill pill-love" draggable="true" data-note-type="love" title="Drag to cell or click to stamp">
+              <span class="pill-dot badge-love"></span>
+              <span class="pill-name">Love Mode ❤️</span>
+            </div>
+            <div class="note-tray-pill pill-discipline" draggable="true" data-note-type="discipline" title="Drag to cell or click to stamp">
+              <span class="pill-dot badge-discipline"></span>
+              <span class="pill-name">Discipline Mode ⚡</span>
+            </div>
+          </div>
+        </div>
+
         <div class="habit-grid-container">
           <div class="habit-grid" id="habit-grid">
             <div class="empty-state">
@@ -211,39 +238,49 @@
         </div>
       </div>
 
-      <!-- Diary View (With Left Calendar Navigation Sidebar) -->
+      <!-- Diary View (Book / Journal Layout) -->
       <div id="view-diary" class="view">
-        <div class="diary-layout-container">
-          <!-- Diary Left Sidebar Calendar -->
-          <aside class="diary-sidebar" id="diary-sidebar-calendar">
-            <div class="diary-calendar-nav">
-              <button type="button" id="diary-prev-month" class="btn btn-icon btn-small" title="Previous month">◀</button>
-              <div class="diary-month-year-picker">
-                <select id="diary-month-select" class="diary-select" aria-label="Select month"></select>
-                <select id="diary-year-select" class="diary-select" aria-label="Select year"></select>
-              </div>
-              <button type="button" id="diary-next-month" class="btn btn-icon btn-small" title="Next month">▶</button>
+        <!-- Top Calendar & Date Navigation Ribbon -->
+        <div class="diary-top-calendar-bar diary-sidebar" id="diary-sidebar-calendar">
+          <div class="diary-calendar-nav">
+            <button type="button" id="diary-prev-month" class="btn btn-icon btn-small" title="Previous month">◀</button>
+            <div class="diary-month-year-picker">
+              <select id="diary-month-select" class="diary-select" aria-label="Select month"></select>
+              <select id="diary-year-select" class="diary-select" aria-label="Select year"></select>
             </div>
-            <div id="diary-mini-calendar" class="diary-mini-calendar"></div>
-            <button type="button" id="diary-jump-today-btn" class="btn btn-secondary btn-small btn-block" style="margin-top:10px;">Today</button>
-          </aside>
+            <button type="button" id="diary-next-month" class="btn btn-icon btn-small" title="Next month">▶</button>
+            <button type="button" id="diary-jump-today-btn" class="btn btn-secondary btn-small">Today</button>
+          </div>
 
-          <!-- Main Diary Area -->
-          <div class="diary-main-content">
-            <div class="view-header">
-              <h1>Daily Diary</h1>
-              <div class="date-picker">
-                <button type="button" id="prev-day" class="btn btn-icon">◀</button>
-                <input type="date" id="diary-date">
-                <button type="button" id="next-day" class="btn btn-icon">▶</button>
+          <div class="diary-top-date-stepper">
+            <button type="button" id="prev-day" class="btn btn-icon" title="Previous day">◀</button>
+            <input type="date" id="diary-date" class="diary-date-input">
+            <button type="button" id="next-day" class="btn btn-icon" title="Next day">▶</button>
+          </div>
+
+          <div id="diary-mini-calendar" class="diary-mini-calendar"></div>
+        </div>
+
+        <!-- Book Journal Spread -->
+        <div class="diary-book-wrapper">
+          <div class="diary-book">
+            <div class="book-spine"></div>
+            <div class="book-ribbon"></div>
+            <div class="book-page">
+              <div class="book-page-header">
+                <div class="book-date-display">
+                  <span class="book-date-title" id="diary-page-date-display">Daily Journal</span>
+                  <span class="book-quote-sub" id="diary-page-day-name">Reflect & Record</span>
+                </div>
+                <div class="book-corner-decor">📖</div>
               </div>
-            </div>
-            <div class="diary-content">
-              <div class="diary-section">
-                <h3>Today's Entry</h3>
-                <textarea id="diary-entry" placeholder="How was your day? What did you learn? What are you grateful for?"></textarea>
+
+              <div class="diary-section book-entry-section">
+                <textarea id="diary-entry" class="book-lined-textarea" placeholder="How was your day? What did you learn? What are you grateful for?"></textarea>
               </div>
-              <div class="diary-section">
+
+              <!-- Today's Tasks Section (Hidden from UI per user request, maintained for test harness compatibility) -->
+              <div class="diary-section" id="diary-tasks-section" style="display:none;" aria-hidden="true">
                 <h3>Today's Tasks</h3>
                 <div id="diary-tasks" class="diary-tasks-list">
                   <div class="empty-state">
@@ -255,8 +292,10 @@
                   <button type="button" id="add-diary-task-btn" class="btn btn-primary btn-small">Add</button>
                 </div>
               </div>
-              <div class="diary-section">
-                <h3>Mood</h3>
+
+              <!-- Mood Section -->
+              <div class="diary-section book-mood-section">
+                <label class="book-mood-label">Today's Mood:</label>
                 <div class="mood-selector" id="mood-selector">
                   <button type="button" class="mood-btn" data-mood="great">😄 Great</button>
                   <button type="button" class="mood-btn" data-mood="good">🙂 Good</button>

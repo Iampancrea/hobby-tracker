@@ -120,6 +120,35 @@ const App = {
     if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', () => toggleSidebar(false));
     if (backdrop) backdrop.addEventListener('click', () => toggleSidebar(false));
 
+    // Desktop Sidebar Collapse & Expand
+    const collapseBtn = document.getElementById('sidebar-collapse-btn');
+    const expandBtn = document.getElementById('sidebar-expand-btn');
+    const mainContent = document.querySelector('.main-content');
+
+    const setSidebarCollapsed = (collapsed) => {
+      if (!sidebar) return;
+      if (collapsed) {
+        sidebar.classList.add('collapsed');
+        if (mainContent) mainContent.classList.add('sidebar-collapsed');
+        if (expandBtn) expandBtn.style.display = 'flex';
+        try { localStorage.setItem('hobby_sidebar_collapsed', '1'); } catch (_) {}
+      } else {
+        sidebar.classList.remove('collapsed');
+        if (mainContent) mainContent.classList.remove('sidebar-collapsed');
+        if (expandBtn) expandBtn.style.display = 'none';
+        try { localStorage.removeItem('hobby_sidebar_collapsed'); } catch (_) {}
+      }
+    };
+
+    if (collapseBtn) collapseBtn.addEventListener('click', () => setSidebarCollapsed(true));
+    if (expandBtn) expandBtn.addEventListener('click', () => setSidebarCollapsed(false));
+
+    try {
+      if (localStorage.getItem('hobby_sidebar_collapsed') === '1' && window.innerWidth > 768) {
+        setSidebarCollapsed(true);
+      }
+    } catch (_) {}
+
     // Lock button
     const lockBtn = document.getElementById('lock-btn');
     if (lockBtn) {

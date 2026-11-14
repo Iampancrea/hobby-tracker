@@ -133,6 +133,7 @@ const Views = {
           <span class="habit-icon" style="color: ${habitColor}">${habit.icon || '●'}</span>
           <span class="habit-name">${this.escapeHtml(habit.name)}</span>
           <span class="streak-badge">${streak}</span>
+          <button type="button" class="habit-delete-row-btn" data-habit-id="${habit.id}" title="Delete Habit">🗑️</button>
         </div>
       </td>`;
 
@@ -180,8 +181,54 @@ const Views = {
     html += '</tbody></table>';
     grid.innerHTML = html;
 
+    // Auto-scroll grid to today (Nov 14) so today's date is centered in view
+    setTimeout(() => {
+      const todayEl = grid.querySelector('.today-cell') || grid.querySelector('.today-header');
+      const container = document.querySelector('.habit-grid-container');
+      if (todayEl && container) {
+        const offsetLeft = todayEl.offsetLeft;
+        const containerWidth = container.clientWidth;
+        container.scrollLeft = Math.max(0, offsetLeft - (containerWidth / 2) + 60);
+      }
+    }, 50);
+
+    // Wire Draggable Note Tray
+    document.querySelectorAll('.note-tray-pill').forEach(pill => {
+      pill.ondragstart = (e) => {
+        if (e.dataTransfer) {
+          e.dataTransfer.setData('text/plain', pill.dataset.noteType);
+        }
+      };
+      pill.onclick = () => {
+        const wasActive = pill.classList.contains('active-stamp');
+        document.querySelectorAll('.note-tray-pill').forEach(p => p.classList.remove('active-stamp'));
+        if (!wasActive) pill.classList.add('active-stamp');
+      };
+    });
+
     // Attach click and contextmenu handlers
     grid.querySelectorAll('.day-cell').forEach(cell => {
+      // Drag & Drop Note acceptance
+      cell.ondragover = (e) => {
+        if (cell.classList.contains('disabled')) return;
+        e.preventDefault();
+        cell.classList.add('cell-drop-target');
+      };
+
+      cell.ondragleave = () => {
+        cell.classList.remove('cell-drop-target');
+      };
+
+      cell.ondrop = (e) => {
+        e.preventDefault();
+        cell.classList.remove('cell-drop-target');
+        if (cell.classList.contains('disabled')) return;
+        const noteType = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || 'default';
+        const habitId = cell.dataset.habit;
+        const date = cell.dataset.date;
+        Views.openNoteModal(habitId, date, noteType);
+      };
+
       cell.addEventListener('click', async (e) => {
         const habitId = cell.dataset.habit;
         const date = cell.dataset.date;
@@ -195,6 +242,14 @@ const Views = {
         // Open note modal if note indicator clicked
         if (e.target.closest('.cell-note-indicator, .cell-note-badge, .note-badge')) {
           Views.openNoteModal(habitId, date);
+          return;
+        }
+
+        // If a note tray badge is active in stamp mode, open note with that type
+        const activeStamp = document.querySelector('.note-tray-pill.active-stamp');
+        if (activeStamp) {
+          Views.openNoteModal(habitId, date, activeStamp.dataset.noteType);
+          activeStamp.classList.remove('active-stamp');
           return;
         }
 
@@ -216,11 +271,26 @@ const Views = {
         }
       });
 
-      cell.addEventListener('contextmenu', (e) => {
+      // Right-click directly toggles Missed (Cross Mark ✗)
+      cell.addEventListener('contextmenu', async (e) => {
         e.preventDefault();
         const habitId = cell.dataset.habit;
         const date = cell.dataset.date;
-        Views.openNoteModal(habitId, date);
+        const currentToday = Views.formatDateKey(new Date());
+        if (cell.classList.contains('disabled') || date > currentToday) return;
+
+        const cellKey = `${habitId}|${date}`;
+        const cellData = (Views.state.cells && Views.state.cells[cellKey]) || {};
+        const currentStatus = cellData.status || 'empty';
+        const nextStatus = currentStatus === 'missed' ? 'empty' : 'missed';
+
+        try {
+          await API.updateCell(habitId, date, { status: nextStatus });
+          await Views.loadState();
+          await Views.renderHabits();
+        } catch (err) {
+          console.error('Error toggling cross mark:', err);
+        }
       });
     });
 
@@ -236,9 +306,25 @@ const Views = {
       });
     });
 
+    // Habit row direct delete button
+    grid.querySelectorAll('.habit-delete-row-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const habitId = btn.dataset.habitId;
+        const habit = (Views.state.habits || []).find(h => h.id === habitId);
+        const habitName = habit ? habit.name : 'this habit';
+        if (confirm(`Delete habit "${habitName}" and all its history?`)) {
+          await API.deleteHabit(habitId);
+          await Views.loadState();
+          Views.renderHabits();
+        }
+      });
+    });
+
     // Habit label click to open edit modal
     grid.querySelectorAll('.habit-label').forEach(label => {
-      label.addEventListener('click', () => {
+      label.addEventListener('click', (e) => {
+        if (e.target.closest('.habit-delete-row-btn')) return;
         const habitId = label.dataset.habit;
         if (habitId) Views.openHabitModal(habitId);
       });
@@ -274,7 +360,7 @@ const Views = {
     this.openNoteModal(habitId, date);
   },
 
-  openNoteModal(habitId, date) {
+  openNoteModal(habitId, date, selectedType = null) {
     const cellKey = `${habitId}|${date}`;
     const cell = (this.state && this.state.cells && this.state.cells[cellKey]) || {};
     const note = cell.noteId ? (this.state.notes || []).find(n => n.id === cell.noteId) : null;
@@ -290,7 +376,7 @@ const Views = {
     if (textArea) textArea.value = note ? (note.text || '') : '';
     if (deleteBtn) deleteBtn.style.display = note ? 'inline-flex' : 'none';
 
-    const type = note ? (note.type || 'default') : 'default';
+    const type = selectedType || (note ? (note.type || 'default') : 'default');
     modal.querySelectorAll('.note-type-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.type === type);
     });
@@ -624,6 +710,21 @@ const Views = {
       const dateParts = this.currentDiaryDate.split('-');
       this.diaryNavYear = parseInt(dateParts[0], 10);
       this.diaryNavMonth = parseInt(dateParts[1], 10) - 1;
+
+      // Update readable Book Heading
+      const [y, m, d] = dateParts.map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      const fullDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const dateTitleEl = document.getElementById('diary-page-date-display');
+      const dayNameEl = document.getElementById('diary-page-day-name');
+      if (dateTitleEl) {
+        dateTitleEl.textContent = `${fullDays[dt.getUTCDay()]}, ${fullMonths[dt.getUTCMonth()]} ${dt.getUTCDate()}, ${dt.getUTCFullYear()}`;
+      }
+      if (dayNameEl) {
+        const isToday = this.currentDiaryDate === this.formatDateKey(new Date());
+        dayNameEl.textContent = isToday ? '★ Today\'s Journal Page' : 'Historical Journal Page';
+      }
     }
     this.renderDiaryCalendarSidebar();
     

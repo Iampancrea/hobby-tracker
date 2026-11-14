@@ -152,6 +152,13 @@
         </div>
       </header>
 
+      <!-- Automatic Update Notification Banner -->
+      <div id="update-notification" class="update-banner" style="display:none;">
+        <span class="update-banner-icon">⚡</span>
+        <span id="update-banner-text" class="update-banner-text">New version available! Updating automatically...</span>
+        <button type="button" id="update-reload-btn" class="btn btn-small btn-primary" style="margin-left:auto;">Update Now</button>
+      </div>
+
       <!-- Habits View -->
       <div id="view-habits" class="view active">
         <div class="view-header">
@@ -362,6 +369,19 @@
                 <input type="file" id="import-file" accept=".json" style="display:none;">
               </label>
             </div>
+          </div>
+
+          <!-- App Version & Updates Section -->
+          <div class="settings-section">
+            <h3>App Version & Updates</h3>
+            <p class="settings-description">
+              Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
+            </p>
+            <div class="update-info-row">
+              <span class="app-version-badge">Version 3.1</span>
+              <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
+            </div>
+            <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>
           </div>
         </div>
       </div>

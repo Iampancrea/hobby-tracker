@@ -1516,4 +1516,47 @@ input, textarea {
   line-height: 1;
 }
 
+/* === AUTOMATIC UPDATE BANNER === */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  animation: slideDown 0.25s ease-out;
+}
+
+.update-banner-icon {
+  font-size: 16px;
+}
+
+.update-banner-text {
+  flex: 1;
+}
+
+.app-version-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.update-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+
 

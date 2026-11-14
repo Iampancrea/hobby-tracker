@@ -1,5 +1,5 @@
 // Hobby Tracker Service Worker - Offline-First Engine
-const CACHE_NAME = 'hobby-tracker-v3';
+const CACHE_NAME = 'hobby-tracker-v3.1';
 
 const APP_SHELL = [
   './',
@@ -18,6 +18,12 @@ const APP_SHELL = [
   './icons/icon-512.png',
   './icons/icon.svg'
 ];
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

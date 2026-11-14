@@ -13,11 +13,81 @@ const App = {
     }
     this.initialized = true;
 
-    // Register Service Worker for 100% Offline Support
+    // Register Service Worker for 100% Offline Support & Automatic Updates
     if ('serviceWorker' in navigator) {
+      let isRefreshing = false;
+
+      // Handle automatic page refresh when new service worker takes control
+      if (typeof navigator.serviceWorker.addEventListener === 'function') {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            window.location.reload();
+          }
+        });
+      }
+
       navigator.serviceWorker.register('./sw.js').then(reg => {
-        if (reg && typeof reg.update === 'function') {
+        if (!reg) return;
+
+        // Proactively check for updates immediately on launch
+        if (typeof reg.update === 'function') {
           reg.update().catch(() => {});
+        }
+
+        // Periodically check for updates if app stays open (every 15 minutes)
+        setInterval(() => {
+          if (typeof reg.update === 'function') reg.update().catch(() => {});
+        }, 15 * 60 * 1000);
+
+        const updateBanner = document.getElementById('update-notification');
+        const updateText = document.getElementById('update-banner-text');
+        const reloadBtn = document.getElementById('update-reload-btn');
+
+        const triggerImmediateUpdate = (worker) => {
+          if (updateBanner) {
+            if (updateText) updateText.textContent = 'Updating to latest version...';
+            updateBanner.style.display = 'flex';
+          }
+          if (worker && typeof worker.postMessage === 'function') {
+            worker.postMessage({ type: 'SKIP_WAITING' });
+          }
+          setTimeout(() => {
+            if (!isRefreshing) {
+              isRefreshing = true;
+              window.location.reload();
+            }
+          }, 800);
+        };
+
+        if (reloadBtn) {
+          reloadBtn.addEventListener('click', () => {
+            if (reg.waiting) {
+              triggerImmediateUpdate(reg.waiting);
+            } else {
+              window.location.reload();
+            }
+          });
+        }
+
+        // If a worker is already waiting from a previous background download
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          triggerImmediateUpdate(reg.waiting);
+        }
+
+        // When a new update is found during active launch
+        if (typeof reg.addEventListener === 'function') {
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker && typeof newWorker.addEventListener === 'function') {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // A new version downloaded in background: auto-apply!
+                  triggerImmediateUpdate(newWorker);
+                }
+              });
+            }
+          });
         }
       }).catch(err => {
         console.warn('ServiceWorker registration error:', err);
@@ -431,6 +501,39 @@ const App = {
       reader.readAsText(file);
       e.target.value = '';
     });
+
+    // Settings: Check for updates manually
+    const checkUpdatesBtn = document.getElementById('check-updates-btn');
+    if (checkUpdatesBtn) {
+      checkUpdatesBtn.addEventListener('click', async () => {
+        const msg = document.getElementById('update-status-msg');
+        if (msg) {
+          msg.textContent = 'Checking for updates...';
+          msg.style.display = 'block';
+        }
+        if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistration === 'function') {
+          try {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg && typeof reg.update === 'function') {
+              await reg.update();
+              if (reg.waiting || reg.installing) {
+                if (msg) msg.textContent = 'New version detected! Downloading update...';
+              } else {
+                setTimeout(() => {
+                  if (msg) msg.textContent = '✓ You are on the latest version of Hobby Tracker!';
+                }, 800);
+              }
+            } else {
+              if (msg) msg.textContent = '✓ You are on the latest version of Hobby Tracker!';
+            }
+          } catch (e) {
+            if (msg) msg.textContent = 'Could not check updates: ' + e.message;
+          }
+        } else {
+          if (msg) msg.textContent = '✓ You are on the latest version of Hobby Tracker!';
+        }
+      });
+    }
 
     // Modal close buttons
     document.querySelectorAll('.modal-close').forEach(btn => {

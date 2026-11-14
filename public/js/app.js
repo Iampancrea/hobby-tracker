@@ -27,7 +27,7 @@ const App = {
         });
       }
 
-      navigator.serviceWorker.register('./sw.js').then(reg => {
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
         if (!reg) return;
 
         // Proactively check for updates immediately on launch
@@ -537,30 +537,26 @@ const App = {
       checkUpdatesBtn.addEventListener('click', async () => {
         const msg = document.getElementById('update-status-msg');
         if (msg) {
-          msg.textContent = 'Checking for updates...';
+          msg.textContent = 'Updating cache and refreshing to latest version...';
           msg.style.display = 'block';
         }
-        if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistration === 'function') {
-          try {
+        try {
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+          }
+          if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistration === 'function') {
             const reg = await navigator.serviceWorker.getRegistration();
             if (reg && typeof reg.update === 'function') {
               await reg.update();
-              if (reg.waiting || reg.installing) {
-                if (msg) msg.textContent = 'New version detected! Downloading update...';
-              } else {
-                setTimeout(() => {
-                  if (msg) msg.textContent = '✓ You are on the latest version of Hobby Tracker!';
-                }, 800);
-              }
-            } else {
-              if (msg) msg.textContent = '✓ You are on the latest version of Hobby Tracker!';
             }
-          } catch (e) {
-            if (msg) msg.textContent = 'Could not check updates: ' + e.message;
           }
-        } else {
-          if (msg) msg.textContent = '✓ You are on the latest version of Hobby Tracker!';
+        } catch (err) {
+          console.warn('Update check error:', err);
         }
+        setTimeout(() => {
+          window.location.reload(true);
+        }, 300);
       });
     }
 

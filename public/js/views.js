@@ -186,9 +186,18 @@ const Views = {
       const todayEl = grid.querySelector('.today-cell') || grid.querySelector('.today-header');
       const container = document.querySelector('.habit-grid-container');
       if (todayEl && container) {
-        const offsetLeft = todayEl.offsetLeft;
-        const containerWidth = container.clientWidth;
-        container.scrollLeft = Math.max(0, offsetLeft - (containerWidth / 2) + 60);
+        if (typeof todayEl.scrollIntoView === 'function') {
+          todayEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+        }
+        const cellRect = todayEl.getBoundingClientRect ? todayEl.getBoundingClientRect() : null;
+        const contRect = container.getBoundingClientRect ? container.getBoundingClientRect() : null;
+        if (cellRect && contRect && container.clientWidth) {
+          container.scrollLeft += (cellRect.left - contRect.left) - (container.clientWidth / 2) + (cellRect.width / 2);
+        } else if (todayEl.offsetLeft !== undefined) {
+          const offsetLeft = todayEl.offsetLeft;
+          const containerWidth = container.clientWidth || 800;
+          container.scrollLeft = Math.max(0, offsetLeft - (containerWidth / 2) + 60);
+        }
       }
     }, 50);
 

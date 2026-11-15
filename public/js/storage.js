@@ -1,5 +1,39 @@
 // Local-first IndexedDB storage engine for Hobby Tracker
 // Zero server dependencies. Fully functional offline.
+
+// Shared date helpers. User-facing dates must use the device's local
+// calendar, not UTC. Using toISOString() here caused the tracker to roll
+// over to the next/previous day at the wrong time for many timezones.
+const DateUtils = {
+  pad(value) {
+    return String(value).padStart(2, '0');
+  },
+
+  toKey(date = new Date()) {
+    const d = date instanceof Date ? date : new Date(date);
+    return `${d.getFullYear()}-${this.pad(d.getMonth() + 1)}-${this.pad(d.getDate())}`;
+  },
+
+  fromKey(key) {
+    const [year, month, day] = String(key).split('-').map(Number);
+    return new Date(year, month - 1, day);
+  },
+
+  todayKey() {
+    return this.toKey(new Date());
+  },
+
+  addDays(key, days) {
+    const date = this.fromKey(key);
+    date.setDate(date.getDate() + Number(days || 0));
+    return this.toKey(date);
+  },
+
+  compare(a, b) {
+    return String(a).localeCompare(String(b));
+  }
+};
+
 const Storage = {
   dbName: 'HobbyTrackerVault',
   dbVersion: 1,
@@ -368,7 +402,7 @@ const Storage = {
 
   // Cells
   async updateCell(habitId, date, updates) {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = DateUtils.todayKey();
     if (date > todayStr && updates && updates.status && updates.status !== 'empty') {
       throw new Error('Cannot set status for future dates');
     }
@@ -390,7 +424,7 @@ const Storage = {
   },
 
   async setHabitStatus(habitId, date, status) {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = DateUtils.todayKey();
     if (date > todayStr && status && status !== 'empty') {
       throw new Error('Cannot set status for future dates');
     }

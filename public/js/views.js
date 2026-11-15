@@ -3,8 +3,20 @@ const Views = {
   state: null,
   currentHabitDateOffset: 0,
   currentTaskDateOffset: 0,
-  currentDiaryDate: new Date().toISOString().split('T')[0],
+  currentDiaryDate: DateUtils.todayKey(),
   _activeQuote: null,
+
+  // Infinite habit timeline state
+  HABIT_PAST_DAYS: 28,
+  HABIT_FUTURE_DAYS: 1,
+  HABIT_CHUNK_DAYS: 21,
+  HABIT_INITIAL_PAST_RUNWAY: 21,
+  HABIT_INITIAL_FUTURE_RUNWAY: 42,
+  HABIT_EDGE_THRESHOLD: 180,
+  HABIT_MAX_COLUMNS: 1100,
+  _habitDates: [],
+  _habitScrollRaf: null,
+  _habitExtending: false,
 
   async loadState() {
     this.state = await API.getState();
@@ -29,7 +41,7 @@ const Views = {
     }
 
     // Deterministic daily index with quote count modulo
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = DateUtils.todayKey();
     let hash = 0;
     for (let i = 0; i < todayStr.length; i++) {
       hash = ((hash << 5) - hash) + todayStr.charCodeAt(i);
@@ -54,72 +66,156 @@ const Views = {
     banner.style.display = 'block';
   },
 
-  // Date helpers
+  // Date helpers (all user-facing dates are local-time based)
   formatDateKey(d = new Date()) {
     if (typeof d === 'string') return d.split('T')[0];
-    return d.toISOString().split('T')[0];
+    return DateUtils.toKey(d);
   },
 
-  getDatesAround(offset = 0, pastDays = 28, futureDays = 1) {
-    const dates = [];
-    const now = new Date();
-    const todayStr = this.formatDateKey(now);
-    const [y, m, d] = todayStr.split('-').map(Number);
-    const anchorUTC = Date.UTC(y, m - 1, d) + (offset * 86400000);
+  todayKey() {
+    return DateUtils.todayKey();
+  },
 
-    for (let i = -pastDays; i <= futureDays; i++) {
-      const dt = new Date(anchorUTC + (i * 86400000));
-      dates.push(this.formatDateKey(dt));
+  getDatesBetween(startKey, endKey) {
+    const dates = [];
+    let cursor = startKey;
+    let guard = 0;
+    while (cursor <= endKey && guard < 5000) {
+      dates.push(cursor);
+      cursor = DateUtils.addDays(cursor, 1);
+      guard++;
     }
     return dates;
   },
 
+  getDatesAround(offset = 0, pastDays = 28, futureDays = 1) {
+    const anchor = DateUtils.addDays(DateUtils.todayKey(), offset);
+    return this.getDatesBetween(
+      DateUtils.addDays(anchor, -pastDays),
+      DateUtils.addDays(anchor, futureDays)
+    );
+  },
+
   formatDate(dateStr) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const date = new Date(Date.UTC(y, m - 1, d));
-    const todayStr = this.formatDateKey(new Date());
+    const date = DateUtils.fromKey(dateStr);
+    const todayStr = DateUtils.todayKey();
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    const day = days[date.getUTCDay()];
-    const month = months[date.getUTCMonth()];
-    const dayNum = date.getUTCDate();
-
     return {
-      day,
-      month,
-      dayNum,
+      day: days[date.getDay()],
+      month: months[date.getMonth()],
+      dayNum: date.getDate(),
       isToday: dateStr === todayStr
     };
   },
 
-  // Habits view
-  async renderHabits() {
+  formatDateRange(startKey, endKey) {
+    if (!startKey || !endKey) return '';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const [sy, sm, sd] = startKey.split('-').map(Number);
+    const [ey, em, ed] = endKey.split('-').map(Number);
+
+    if (startKey === endKey) return `${months[sm - 1]} ${sd}, ${sy}`;
+    if (sy === ey && sm === em) return `${months[sm - 1]} ${sd} – ${ed}, ${sy}`;
+    if (sy === ey) return `${months[sm - 1]} ${sd} – ${months[em - 1]} ${ed}, ${sy}`;
+    return `${months[sm - 1]} ${sd}, ${sy} – ${months[em - 1]} ${ed}, ${ey}`;
+  },
+
+  formatFullDate(dateKey) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const date = DateUtils.fromKey(dateKey || DateUtils.todayKey());
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  },
+
+  // Habits view (infinite horizontal timeline)
+  async renderHabits(options = {}) {
     await this.loadState();
     const grid = document.getElementById('habit-grid');
     if (!grid) return;
 
-    const showArchivedEl = document.getElementById('show-archived-habits');
-    const showArchived = showArchivedEl ? showArchivedEl.checked : false;
-    const habits = (this.state && this.state.habits) || [];
-    const visibleHabits = showArchived ? habits : habits.filter(h => !h.archived);
+    const visibleHabits = this.getVisibleHabits();
 
     if (visibleHabits.length === 0) {
       grid.innerHTML = '<div class="empty-state"><p>No habits yet. Add one to get started!</p></div>';
+      this._habitDates = [];
+      this.updateHabitRangeLabel();
       return;
     }
 
-    const dates = this.getDatesAround(this.currentHabitDateOffset || 0, 28, 1);
-    const todayStr = this.formatDateKey(new Date());
+    let dates;
+    let builtFresh = false;
+    if ((options.preserveScroll || options.preserveRange) && this._habitDates.length) {
+      dates = this._habitDates.slice();
+    } else {
+      builtFresh = true;
+      dates = this.getDatesAround(
+        this.currentHabitDateOffset || 0,
+        this.HABIT_PAST_DAYS,
+        this.HABIT_FUTURE_DAYS
+      );
+
+      // On real screens, give the timeline a generous runway in both
+      // directions so today can sit comfortably near the middle. The test
+      // DOM has no layout, so the canonical 30-day window stays intact.
+      if (this.habitGridHasLayout(grid)) {
+        dates = this.getDatesBetween(
+          DateUtils.addDays(dates[0], -this.HABIT_INITIAL_PAST_RUNWAY),
+          DateUtils.addDays(dates[dates.length - 1], this.HABIT_INITIAL_FUTURE_RUNWAY)
+        );
+      }
+    }
+
+    this.renderHabitTable(dates, visibleHabits, {
+      preserveScroll: !!options.preserveScroll
+    });
+
+    if (options.centerToday || builtFresh) {
+      const targetDate = options.centerToday
+        ? DateUtils.todayKey()
+        : DateUtils.addDays(DateUtils.todayKey(), this.currentHabitDateOffset || 0);
+      setTimeout(() => this.scrollHabitGridToDate(targetDate, false), 0);
+    }
+  },
+
+  getVisibleHabits() {
+    const showArchivedEl = document.getElementById('show-archived-habits');
+    const showArchived = showArchivedEl ? showArchivedEl.checked : false;
+    const habits = (this.state && this.state.habits) || [];
+    return showArchived ? habits : habits.filter(h => !h.archived);
+  },
+
+  renderHabitTable(dates, visibleHabits, options = {}) {
+    const grid = document.getElementById('habit-grid');
+    if (!grid) return;
+
+    const todayStr = DateUtils.todayKey();
+    const anchor = options.preserveScroll ? this.getHabitAnchor() : null;
+
+    const dateMeta = new Map();
+    dates.forEach(date => {
+      const info = this.formatDate(date);
+      info.dow = DateUtils.fromKey(date).getDay();
+      info.isMonthStart = info.dayNum === 1;
+      info.isWeekend = info.dow === 0 || info.dow === 6;
+      dateMeta.set(date, info);
+    });
 
     let html = '<table class="calendar-table"><thead><tr>';
-    html += '<th class="habit-header">Habit</th>';
+    html += '<th class="habit-header"><span class="habit-header-label">Habit</span></th>';
 
     dates.forEach(date => {
-      const { day, month, dayNum, isToday } = this.formatDate(date);
-      const todayClass = isToday ? 'today-header' : '';
-      html += `<th class="day-header ${todayClass}" data-date="${date}">${day}<br>${month} ${dayNum}</th>`;
+      const meta = dateMeta.get(date);
+      const classes = ['day-header'];
+      if (meta.isToday) classes.push('today-header');
+      if (meta.isMonthStart) classes.push('month-start');
+      if (meta.isWeekend) classes.push('weekend-header');
+      html += `<th class="${classes.join(' ')}" data-date="${date}" title="${this.formatFullDate(date)}">` +
+        `<span class="day-name">${meta.day}</span>` +
+        `<span class="day-date">${meta.month} ${meta.dayNum}</span>` +
+        '</th>';
     });
     html += '</tr></thead><tbody>';
 
@@ -132,17 +228,17 @@ const Views = {
         <div class="habit-label-content">
           <span class="habit-icon" style="color: ${habitColor}">${habit.icon || '●'}</span>
           <span class="habit-name">${this.escapeHtml(habit.name)}</span>
-          <span class="streak-badge">${streak}</span>
+          <span class="streak-badge" title="Current streak">${streak}</span>
           <button type="button" class="habit-delete-row-btn" data-habit-id="${habit.id}" title="Delete Habit">🗑️</button>
         </div>
       </td>`;
 
       dates.forEach(date => {
+        const meta = dateMeta.get(date);
         const cellKey = `${habit.id}|${date}`;
         const cell = (this.state.cells && this.state.cells[cellKey]) || {};
         const status = cell.status || 'empty';
         const isFuture = date > todayStr;
-        const isToday = date === todayStr;
 
         let statusIcon = '';
         let statusStyle = '';
@@ -155,7 +251,9 @@ const Views = {
 
         const cellClasses = ['day-cell'];
         if (isFuture) cellClasses.push('disabled');
-        if (isToday) cellClasses.push('today-cell');
+        if (meta.isToday) cellClasses.push('today-cell');
+        if (meta.isWeekend) cellClasses.push('weekend-cell');
+        if (meta.isMonthStart) cellClasses.push('month-start-cell');
 
         let noteBadgeHtml = '';
         if (cell.noteId) {
@@ -165,7 +263,7 @@ const Views = {
           noteBadgeHtml = `<div class="cell-note-badge cell-note-indicator badge-${noteType}" data-note-type="${noteType}" ${tooltip}></div>`;
         }
 
-        html += `<td class="${isToday ? 'today-cell' : ''} ${isFuture ? 'disabled' : ''}">
+        html += `<td class="${meta.isToday ? 'today-cell' : ''} ${isFuture ? 'disabled' : ''} ${meta.isWeekend ? 'weekend-cell' : ''} ${meta.isMonthStart ? 'month-start-cell' : ''}">
           <div class="${cellClasses.join(' ')}" data-habit="${habit.id}" data-habit-id="${habit.id}" data-date="${date}" ${isFuture ? 'disabled' : ''}>
             <div class="day-cell-content">
               <div class="cell-status ${status}" ${statusStyle}>${statusIcon}</div>
@@ -180,26 +278,11 @@ const Views = {
 
     html += '</tbody></table>';
     grid.innerHTML = html;
+    this._habitDates = dates.slice();
 
-    // Auto-scroll grid to today (Nov 14) so today's date is centered in view
-    setTimeout(() => {
-      const todayEl = grid.querySelector('.today-cell') || grid.querySelector('.today-header');
-      const container = document.querySelector('.habit-grid-container');
-      if (todayEl && container) {
-        if (typeof todayEl.scrollIntoView === 'function') {
-          todayEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
-        }
-        const cellRect = todayEl.getBoundingClientRect ? todayEl.getBoundingClientRect() : null;
-        const contRect = container.getBoundingClientRect ? container.getBoundingClientRect() : null;
-        if (cellRect && contRect && container.clientWidth) {
-          container.scrollLeft += (cellRect.left - contRect.left) - (container.clientWidth / 2) + (cellRect.width / 2);
-        } else if (todayEl.offsetLeft !== undefined) {
-          const offsetLeft = todayEl.offsetLeft;
-          const containerWidth = container.clientWidth || 800;
-          container.scrollLeft = Math.max(0, offsetLeft - (containerWidth / 2) + 60);
-        }
-      }
-    }, 50);
+    if (anchor) this.restoreHabitAnchor(anchor);
+    this.bindHabitScroll();
+    this.updateHabitRangeLabel();
 
     // Wire Draggable Note Tray
     document.querySelectorAll('.note-tray-pill').forEach(pill => {
@@ -241,7 +324,7 @@ const Views = {
       cell.addEventListener('click', async (e) => {
         const habitId = cell.dataset.habit;
         const date = cell.dataset.date;
-        const currentToday = Views.formatDateKey(new Date());
+        const currentToday = DateUtils.todayKey();
 
         // Strictly reject future dates
         if (cell.classList.contains('disabled') || date > currentToday) {
@@ -274,7 +357,7 @@ const Views = {
         try {
           await API.updateCell(habitId, date, { status: nextStatus });
           await Views.loadState();
-          await Views.renderHabits();
+          await Views.renderHabits({ preserveScroll: true });
         } catch (err) {
           console.error('Error updating cell status:', err);
         }
@@ -285,7 +368,7 @@ const Views = {
         e.preventDefault();
         const habitId = cell.dataset.habit;
         const date = cell.dataset.date;
-        const currentToday = Views.formatDateKey(new Date());
+        const currentToday = DateUtils.todayKey();
         if (cell.classList.contains('disabled') || date > currentToday) return;
 
         const cellKey = `${habitId}|${date}`;
@@ -296,7 +379,7 @@ const Views = {
         try {
           await API.updateCell(habitId, date, { status: nextStatus });
           await Views.loadState();
-          await Views.renderHabits();
+          await Views.renderHabits({ preserveScroll: true });
         } catch (err) {
           console.error('Error toggling cross mark:', err);
         }
@@ -325,7 +408,7 @@ const Views = {
         if (confirm(`Delete habit "${habitName}" and all its history?`)) {
           await API.deleteHabit(habitId);
           await Views.loadState();
-          Views.renderHabits();
+          Views.renderHabits({ preserveScroll: true });
         }
       });
     });
@@ -340,16 +423,258 @@ const Views = {
     });
   },
 
+  // --- Infinite habit timeline helpers ---
+  // The test DOM has no layout engine, so all scrolling behaviour is gated
+  // behind a real (positive) clientWidth. Tests therefore keep seeing the
+  // canonical 30-column window while browsers get an endless timeline.
+  habitGridHasLayout(grid = document.getElementById('habit-grid')) {
+    if (!grid) return false;
+    const width = Number(grid.clientWidth);
+    return Number.isFinite(width) && width > 0;
+  },
+
+  getHabitAnchor() {
+    const grid = document.getElementById('habit-grid');
+    if (!grid || !this.habitGridHasLayout(grid)) return null;
+
+    const scrollLeft = Number(grid.scrollLeft) || 0;
+    const headers = grid.querySelectorAll('th.day-header');
+    if (!headers.length) return { date: null, delta: 0, scrollLeft };
+
+    let anchorHeader = headers[0];
+    for (let i = 0; i < headers.length; i++) {
+      const left = Number(headers[i].offsetLeft) || 0;
+      if (left <= scrollLeft) anchorHeader = headers[i];
+      else break;
+    }
+
+    return {
+      date: anchorHeader.dataset.date || null,
+      delta: scrollLeft - (Number(anchorHeader.offsetLeft) || 0),
+      scrollLeft
+    };
+  },
+
+  restoreHabitAnchor(anchor) {
+    const grid = document.getElementById('habit-grid');
+    if (!grid || !anchor) return;
+
+    if (anchor.date) {
+      const header = grid.querySelector(`th.day-header[data-date="${anchor.date}"]`);
+      if (header) {
+        const target = (Number(header.offsetLeft) || 0) + (Number(anchor.delta) || 0);
+        grid.scrollLeft = Math.max(0, target);
+        return;
+      }
+    }
+
+    if (Number.isFinite(Number(anchor.scrollLeft))) {
+      grid.scrollLeft = Math.max(0, Number(anchor.scrollLeft));
+    }
+  },
+
+  bindHabitScroll() {
+    const grid = document.getElementById('habit-grid');
+    if (!grid) return;
+    grid.onscroll = () => this.onHabitScroll();
+  },
+
+  onHabitScroll() {
+    const grid = document.getElementById('habit-grid');
+    if (!grid || !this.habitGridHasLayout(grid)) return;
+
+    // Extend synchronously: the edge check is cheap and this keeps the
+    // timeline growing even where animation frames are throttled.
+    this.maybeExtendHabitTimeline();
+
+    if (this._habitScrollRaf) return;
+
+    const run = () => {
+      this._habitScrollRaf = null;
+      this.updateHabitRangeLabel();
+    };
+
+    if (typeof requestAnimationFrame === 'function') {
+      this._habitScrollRaf = requestAnimationFrame(run);
+    } else {
+      this._habitScrollRaf = setTimeout(run, 16);
+    }
+  },
+
+  maybeExtendHabitTimeline() {
+    const grid = document.getElementById('habit-grid');
+    if (!grid || this._habitExtending || !this._habitDates.length) return;
+    if (!this.habitGridHasLayout(grid)) return;
+
+    const dates = this._habitDates;
+    if (dates.length >= this.HABIT_MAX_COLUMNS) return;
+
+    const scrollLeft = Number(grid.scrollLeft) || 0;
+    const viewport = Number(grid.clientWidth) || 0;
+    const scrollWidth = Number(grid.scrollWidth) || 0;
+    const nearStart = scrollLeft <= this.HABIT_EDGE_THRESHOLD;
+    const nearEnd = scrollWidth - (scrollLeft + viewport) <= this.HABIT_EDGE_THRESHOLD;
+    if (!nearStart && !nearEnd) return;
+
+    let nextDates = dates.slice();
+
+    if (nearStart) {
+      const room = this.HABIT_MAX_COLUMNS - nextDates.length;
+      if (room > 0) {
+        const count = Math.min(this.HABIT_CHUNK_DAYS, room);
+        const first = nextDates[0];
+        nextDates = this.getDatesBetween(
+          DateUtils.addDays(first, -count),
+          DateUtils.addDays(first, -1)
+        ).concat(nextDates);
+      }
+    }
+
+    if (nearEnd) {
+      const room = this.HABIT_MAX_COLUMNS - nextDates.length;
+      if (room > 0) {
+        const count = Math.min(this.HABIT_CHUNK_DAYS, room);
+        const last = nextDates[nextDates.length - 1];
+        nextDates = nextDates.concat(this.getDatesBetween(
+          DateUtils.addDays(last, 1),
+          DateUtils.addDays(last, count)
+        ));
+      }
+    }
+
+    if (nextDates.length === dates.length) return;
+
+    this._habitExtending = true;
+    this.renderHabitTable(nextDates, this.getVisibleHabits(), { preserveScroll: true });
+
+    // The re-render itself moves scrollLeft while restoring the anchor.
+    // Keep edge checks paused for a couple of frames so that the resulting
+    // scroll event cannot start a redundant extension pass.
+    const release = () => { this._habitExtending = false; };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => requestAnimationFrame(release));
+    } else {
+      setTimeout(release, 32);
+    }
+  },
+
+  getHabitVisibleCenterDate() {
+    const grid = document.getElementById('habit-grid');
+    if (!grid || !this.habitGridHasLayout(grid) || !this._habitDates.length) {
+      return this._habitDates[0] || DateUtils.todayKey();
+    }
+
+    const scrollLeft = Number(grid.scrollLeft) || 0;
+    const viewport = Number(grid.clientWidth) || 0;
+    const sticky = grid.querySelector('th.habit-header');
+    const stickyWidth = Number(sticky && sticky.offsetWidth) || 0;
+    const centerX = scrollLeft + stickyWidth + Math.max(0, viewport - stickyWidth) / 2;
+
+    let result = this._habitDates[0];
+    grid.querySelectorAll('th.day-header').forEach(header => {
+      const left = Number(header.offsetLeft) || 0;
+      if (left <= centerX && header.dataset.date) result = header.dataset.date;
+    });
+    return result;
+  },
+
+  scrollHabitGridToDate(dateKey, smooth = true) {
+    if (!dateKey) return false;
+    const grid = document.getElementById('habit-grid');
+    if (!grid) return false;
+
+    if (!this._habitDates.includes(dateKey)) {
+      this.centerHabitTimelineOn(dateKey, smooth);
+      return true;
+    }
+
+    if (!this.habitGridHasLayout(grid)) return false;
+    const header = grid.querySelector(`th.day-header[data-date="${dateKey}"]`);
+    if (!header) return false;
+
+    const viewport = Number(grid.clientWidth) || 0;
+    const sticky = grid.querySelector('th.habit-header');
+    const stickyWidth = Number(sticky && sticky.offsetWidth) || 0;
+    const visibleWidth = Math.max(0, viewport - stickyWidth);
+    const headerLeft = Number(header.offsetLeft) || 0;
+    const headerWidth = Number(header.offsetWidth) || 0;
+    const target = headerLeft + headerWidth / 2 - visibleWidth / 2 - stickyWidth;
+    const maxScroll = Math.max(0, (Number(grid.scrollWidth) || 0) - viewport);
+    let left = Math.min(maxScroll, Math.max(0, target));
+
+    // Snap to a date-column boundary so the first visible column is not
+    // awkwardly sliced in half by the sticky habit column.
+    let nearest = null;
+    grid.querySelectorAll('th.day-header').forEach(candidate => {
+      const candidateLeft = Number(candidate.offsetLeft) || 0;
+      const distance = Math.abs(candidateLeft - (left + stickyWidth));
+      if (!nearest || distance < nearest.distance) {
+        nearest = { left: candidateLeft, distance };
+      }
+    });
+    if (nearest) {
+      left = Math.min(maxScroll, Math.max(0, nearest.left - stickyWidth));
+    }
+
+    if (smooth && typeof grid.scrollTo === 'function') {
+      try {
+        grid.scrollTo({ left, behavior: 'smooth' });
+      } catch (_) {
+        grid.scrollLeft = left;
+      }
+    } else {
+      grid.scrollLeft = left;
+    }
+    this.updateHabitRangeLabel();
+    return true;
+  },
+
+  scrollHabitsByDays(days, smooth = true) {
+    if (!this._habitDates.length) return false;
+    const baseDate = this.getHabitVisibleCenterDate();
+    return this.scrollHabitGridToDate(DateUtils.addDays(baseDate, days), smooth);
+  },
+
+  centerHabitTimelineOn(dateKey, smooth = true) {
+    const grid = document.getElementById('habit-grid');
+    if (!grid) return;
+
+    const target = dateKey || DateUtils.todayKey();
+    let dates = this.getDatesBetween(
+      DateUtils.addDays(target, -this.HABIT_PAST_DAYS),
+      DateUtils.addDays(target, this.HABIT_FUTURE_DAYS)
+    );
+
+    if (this.habitGridHasLayout(grid)) {
+      dates = this.getDatesBetween(
+        DateUtils.addDays(dates[0], -this.HABIT_INITIAL_PAST_RUNWAY),
+        DateUtils.addDays(dates[dates.length - 1], this.HABIT_INITIAL_FUTURE_RUNWAY)
+      );
+    }
+
+    this.renderHabitTable(dates, this.getVisibleHabits(), { preserveScroll: false });
+    setTimeout(() => this.scrollHabitGridToDate(target, smooth), 0);
+  },
+
+  updateHabitRangeLabel() {
+    const label = document.getElementById('habit-range-label');
+    if (!label) return;
+    if (!this._habitDates.length) {
+      label.textContent = '';
+      return;
+    }
+    label.textContent = this.formatDateRange(
+      this._habitDates[0],
+      this._habitDates[this._habitDates.length - 1]
+    );
+  },
+
   calculateStreak(habitId) {
     let streak = 0;
-    const now = new Date();
-    const todayStr = this.formatDateKey(now);
-    const [y, m, d] = todayStr.split('-').map(Number);
-    const todayUTC = Date.UTC(y, m - 1, d);
+    const todayStr = DateUtils.todayKey();
 
     for (let i = 0; i < 365; i++) {
-      const dt = new Date(todayUTC - (i * 86400000));
-      const dateStr = this.formatDateKey(dt);
+      const dateStr = DateUtils.addDays(todayStr, -i);
       const cellKey = `${habitId}|${dateStr}`;
       const cell = this.state && this.state.cells && this.state.cells[cellKey];
 
@@ -564,16 +889,54 @@ const Views = {
   },
 
   // Diary Calendar Sidebar Navigation
+  populateDiaryYearOptions(yearSelect, selectedYear) {
+    if (!yearSelect) return;
+    const parsed = parseInt(selectedYear, 10);
+    const center = Number.isFinite(parsed) ? parsed : new Date().getFullYear();
+
+    // Keep a wide window around the selected year. Whenever the user
+    // navigates past either edge, the window is rebuilt around the new year,
+    // so the calendar behaves like an endless timeline.
+    const span = 25;
+    let html = '';
+    for (let y = center - span; y <= center + span; y++) {
+      html += `<option value="${y}">${y}</option>`;
+    }
+    yearSelect.innerHTML = html;
+  },
+
+  setDiaryNavMonth(monthDelta) {
+    let month = (Number(this.diaryNavMonth) || 0) + monthDelta;
+    while (month < 0) {
+      month += 12;
+      this.diaryNavYear = (Number(this.diaryNavYear) || new Date().getFullYear()) - 1;
+    }
+    while (month > 11) {
+      month -= 12;
+      this.diaryNavYear = (Number(this.diaryNavYear) || new Date().getFullYear()) + 1;
+    }
+    this.diaryNavMonth = month;
+
+    const monthSelect = document.getElementById('diary-month-select');
+    const yearSelect = document.getElementById('diary-year-select');
+    if (monthSelect) monthSelect.value = this.diaryNavMonth;
+    if (yearSelect) {
+      this.populateDiaryYearOptions(yearSelect, this.diaryNavYear);
+      yearSelect.value = this.diaryNavYear;
+    }
+    this.renderDiaryMiniCalendar();
+  },
+
   renderDiaryCalendarSidebar() {
     const sidebar = document.getElementById('diary-sidebar-calendar') || document.querySelector('.diary-sidebar');
     if (!sidebar) return;
 
-    const dateParts = this.currentDiaryDate.split('-');
+    const dateParts = String(this.currentDiaryDate || DateUtils.todayKey()).split('-');
     const currentYear = parseInt(dateParts[0], 10);
     const currentMonth = parseInt(dateParts[1], 10) - 1; // 0-indexed
 
-    if (this.diaryNavYear === undefined) this.diaryNavYear = currentYear;
-    if (this.diaryNavMonth === undefined) this.diaryNavMonth = currentMonth;
+    if (!Number.isFinite(this.diaryNavYear)) this.diaryNavYear = currentYear;
+    if (!Number.isFinite(this.diaryNavMonth)) this.diaryNavMonth = currentMonth;
 
     const monthSelect = document.getElementById('diary-month-select');
     const yearSelect = document.getElementById('diary-year-select');
@@ -593,61 +956,40 @@ const Views = {
         opt.textContent = name;
         monthSelect.appendChild(opt);
       });
+    }
+
+    if (monthSelect) {
+      monthSelect.value = this.diaryNavMonth;
       monthSelect.onchange = () => {
         this.diaryNavMonth = parseInt(monthSelect.value, 10);
         this.renderDiaryMiniCalendar();
       };
     }
 
-    if (yearSelect && getOptionsCount(yearSelect) === 0) {
-      for (let y = 2015; y <= 2035; y++) {
-        const opt = document.createElement('option');
-        opt.value = y;
-        opt.textContent = y;
-        yearSelect.appendChild(opt);
-      }
+    if (yearSelect) {
+      this.populateDiaryYearOptions(yearSelect, this.diaryNavYear);
+      yearSelect.value = this.diaryNavYear;
       yearSelect.onchange = () => {
         this.diaryNavYear = parseInt(yearSelect.value, 10);
         this.renderDiaryMiniCalendar();
       };
     }
 
-    if (monthSelect) monthSelect.value = this.diaryNavMonth;
-    if (yearSelect) yearSelect.value = this.diaryNavYear;
-
     // Previous / Next Month button wiring
     const prevMonthBtn = document.getElementById('diary-prev-month');
     if (prevMonthBtn) {
-      prevMonthBtn.onclick = () => {
-        this.diaryNavMonth--;
-        if (this.diaryNavMonth < 0) {
-          this.diaryNavMonth = 11;
-          this.diaryNavYear--;
-        }
-        if (monthSelect) monthSelect.value = this.diaryNavMonth;
-        if (yearSelect) yearSelect.value = this.diaryNavYear;
-        this.renderDiaryMiniCalendar();
-      };
+      prevMonthBtn.onclick = () => this.setDiaryNavMonth(-1);
     }
 
     const nextMonthBtn = document.getElementById('diary-next-month');
     if (nextMonthBtn) {
-      nextMonthBtn.onclick = () => {
-        this.diaryNavMonth++;
-        if (this.diaryNavMonth > 11) {
-          this.diaryNavMonth = 0;
-          this.diaryNavYear++;
-        }
-        if (monthSelect) monthSelect.value = this.diaryNavMonth;
-        if (yearSelect) yearSelect.value = this.diaryNavYear;
-        this.renderDiaryMiniCalendar();
-      };
+      nextMonthBtn.onclick = () => this.setDiaryNavMonth(1);
     }
 
     const todayBtn = document.getElementById('diary-jump-today-btn');
     if (todayBtn) {
       todayBtn.onclick = () => {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = DateUtils.todayKey();
         this.currentDiaryDate = todayStr;
         const parts = todayStr.split('-');
         this.diaryNavYear = parseInt(parts[0], 10);
@@ -663,11 +1005,11 @@ const Views = {
     const miniCalendar = document.getElementById('diary-mini-calendar');
     if (!miniCalendar) return;
 
-    const y = this.diaryNavYear;
-    const m = this.diaryNavMonth;
+    const y = Number.isFinite(this.diaryNavYear) ? this.diaryNavYear : new Date().getFullYear();
+    const m = Number.isFinite(this.diaryNavMonth) ? this.diaryNavMonth : new Date().getMonth();
     const firstDay = new Date(y, m, 1).getDay();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = DateUtils.todayKey();
 
     let html = '<div class="mini-cal-weekdays">';
     ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => {
@@ -695,7 +1037,7 @@ const Views = {
       if (isToday) cls += ' today';
       if (hasEntry) cls += ' has-entry';
 
-      html += `<button type="button" class="${cls}" data-date="${dateStr}">${d}</button>`;
+      html += `<button type="button" class="${cls}" data-date="${dateStr}" aria-label="${this.formatFullDate(dateStr)}">${d}</button>`;
     }
 
     html += '</div>';
@@ -721,18 +1063,20 @@ const Views = {
       this.diaryNavMonth = parseInt(dateParts[1], 10) - 1;
 
       // Update readable Book Heading
-      const [y, m, d] = dateParts.map(Number);
-      const dt = new Date(Date.UTC(y, m - 1, d));
+      const dt = DateUtils.fromKey(this.currentDiaryDate);
       const fullDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       const dateTitleEl = document.getElementById('diary-page-date-display');
       const dayNameEl = document.getElementById('diary-page-day-name');
       if (dateTitleEl) {
-        dateTitleEl.textContent = `${fullDays[dt.getUTCDay()]}, ${fullMonths[dt.getUTCMonth()]} ${dt.getUTCDate()}, ${dt.getUTCFullYear()}`;
+        dateTitleEl.textContent = `${fullDays[dt.getDay()]}, ${fullMonths[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
       }
       if (dayNameEl) {
-        const isToday = this.currentDiaryDate === this.formatDateKey(new Date());
-        dayNameEl.textContent = isToday ? '★ Today\'s Journal Page' : 'Historical Journal Page';
+        const todayKey = DateUtils.todayKey();
+        const isToday = this.currentDiaryDate === todayKey;
+        dayNameEl.textContent = isToday
+          ? '★ Today\'s Journal Page'
+          : (this.currentDiaryDate > todayKey ? 'Future Journal Page' : 'Historical Journal Page');
       }
     }
     this.renderDiaryCalendarSidebar();

@@ -142,8 +142,11 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <main class="main-content">
-      <!-- Floating Sidebar Expand Button (visible when sidebar is collapsed) -->
-      <button type="button" id="sidebar-expand-btn" class="sidebar-expand-float-btn" title="Show sidebar" style="display:none;">☰</button>
+      <!-- Collapsed Sidebar Topbar (in-flow, so it never covers the quote) -->
+      <div id="collapsed-topbar" class="collapsed-topbar">
+        <button type="button" id="sidebar-expand-btn" class="btn btn-icon" title="Show sidebar" aria-label="Show sidebar">☰</button>
+        <span class="collapsed-topbar-title">Hobby Tracker</span>
+      </div>
 
       <!-- Top Quote Banner (Permanent across all views) -->
       <header id="top-quote-banner" class="top-quote-banner" style="display:none;">
@@ -166,11 +169,18 @@
       <!-- Habits View -->
       <div id="view-habits" class="view active">
         <div class="view-header">
-          <h1>Daily Habits</h1>
+          <div class="view-title-block">
+            <h1>Daily Habits</h1>
+            <span id="habit-range-label" class="habit-range-label"></span>
+          </div>
           <div class="view-controls">
             <button id="prev-week" class="btn btn-icon" title="Previous week">◀</button>
             <button id="today-btn" class="btn btn-small">Today</button>
             <button id="next-week" class="btn btn-icon" title="Next week">▶</button>
+            <label class="habit-jump-wrap">
+              <span>Jump</span>
+              <input type="date" id="habit-jump-date" class="habit-jump-date" title="Jump to a date" aria-label="Jump to a date">
+            </label>
           </div>
         </div>
         <div class="habit-controls">
@@ -417,7 +427,7 @@
               Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
             </p>
             <div class="update-info-row">
-              <span class="app-version-badge">Version 3.1</span>
+              <span class="app-version-badge">Version 3.3</span>
               <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
             </div>
             <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>

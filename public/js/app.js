@@ -130,12 +130,10 @@ const App = {
       if (collapsed) {
         sidebar.classList.add('collapsed');
         if (mainContent) mainContent.classList.add('sidebar-collapsed');
-        if (expandBtn) expandBtn.style.display = 'flex';
         try { localStorage.setItem('hobby_sidebar_collapsed', '1'); } catch (_) {}
       } else {
         sidebar.classList.remove('collapsed');
         if (mainContent) mainContent.classList.remove('sidebar-collapsed');
-        if (expandBtn) expandBtn.style.display = 'none';
         try { localStorage.removeItem('hobby_sidebar_collapsed'); } catch (_) {}
       }
     };
@@ -185,27 +183,46 @@ const App = {
     });
 
     // Habits view controls
+    const stepHabitTimeline = (days) => {
+      if (Views.habitGridHasLayout()) {
+        Views.scrollHabitsByDays(days);
+      } else {
+        Views.currentHabitDateOffset += days;
+        Views.renderHabits();
+      }
+    };
+
     document.getElementById('prev-week').addEventListener('click', () => {
-      Views.currentHabitDateOffset -= 7;
-      Views.renderHabits();
+      stepHabitTimeline(-7);
     });
 
     document.getElementById('next-week').addEventListener('click', () => {
-      Views.currentHabitDateOffset += 7;
-      Views.renderHabits();
+      stepHabitTimeline(7);
     });
 
     document.getElementById('today-btn').addEventListener('click', () => {
       Views.currentHabitDateOffset = 0;
-      Views.renderHabits();
+      if (Views.habitGridHasLayout()) {
+        Views.scrollHabitGridToDate(DateUtils.todayKey());
+      } else {
+        Views.renderHabits({ centerToday: true });
+      }
     });
+
+    const habitJumpDate = document.getElementById('habit-jump-date');
+    if (habitJumpDate) {
+      habitJumpDate.addEventListener('change', () => {
+        if (!habitJumpDate.value) return;
+        Views.scrollHabitGridToDate(habitJumpDate.value);
+      });
+    }
 
     document.getElementById('add-habit-btn').addEventListener('click', () => {
       Views.openHabitModal();
     });
 
     document.getElementById('show-archived-habits').addEventListener('change', () => {
-      Views.renderHabits();
+      Views.renderHabits({ preserveScroll: true });
     });
 
     // Tasks view controls
@@ -271,38 +288,25 @@ const App = {
       });
     }
 
+    const stepDiaryDay = (days) => {
+      const nextDate = DateUtils.addDays(Views.currentDiaryDate || DateUtils.todayKey(), days);
+      Views.currentDiaryDate = nextDate;
+      const [y, m] = nextDate.split('-').map(Number);
+      Views.diaryNavYear = y;
+      Views.diaryNavMonth = m - 1;
+      const dInput = document.getElementById('diary-date');
+      if (dInput) dInput.value = nextDate;
+      Views.renderDiary();
+    };
+
     const prevDayBtn = document.getElementById('prev-day');
     if (prevDayBtn) {
-      prevDayBtn.addEventListener('click', () => {
-        const [y, m, d] = Views.currentDiaryDate.split('-').map(Number);
-        const dt = new Date(Date.UTC(y, m - 1, d - 1));
-        const nextY = dt.getUTCFullYear();
-        const nextM = String(dt.getUTCMonth() + 1).padStart(2, '0');
-        const nextD = String(dt.getUTCDate()).padStart(2, '0');
-        Views.currentDiaryDate = `${nextY}-${nextM}-${nextD}`;
-        Views.diaryNavYear = nextY;
-        Views.diaryNavMonth = dt.getUTCMonth();
-        const dInput = document.getElementById('diary-date');
-        if (dInput) dInput.value = Views.currentDiaryDate;
-        Views.renderDiary();
-      });
+      prevDayBtn.addEventListener('click', () => stepDiaryDay(-1));
     }
 
     const nextDayBtn = document.getElementById('next-day');
     if (nextDayBtn) {
-      nextDayBtn.addEventListener('click', () => {
-        const [y, m, d] = Views.currentDiaryDate.split('-').map(Number);
-        const dt = new Date(Date.UTC(y, m - 1, d + 1));
-        const nextY = dt.getUTCFullYear();
-        const nextM = String(dt.getUTCMonth() + 1).padStart(2, '0');
-        const nextD = String(dt.getUTCDate()).padStart(2, '0');
-        Views.currentDiaryDate = `${nextY}-${nextM}-${nextD}`;
-        Views.diaryNavYear = nextY;
-        Views.diaryNavMonth = dt.getUTCMonth();
-        const dInput = document.getElementById('diary-date');
-        if (dInput) dInput.value = Views.currentDiaryDate;
-        Views.renderDiary();
-      });
+      nextDayBtn.addEventListener('click', () => stepDiaryDay(1));
     }
 
     // Mood selector buttons
@@ -310,7 +314,7 @@ const App = {
       btn.addEventListener('click', async (e) => {
         const clickedBtn = e.currentTarget;
         const mood = clickedBtn.dataset.mood;
-        const date = Views.currentDiaryDate || (document.getElementById('diary-date') ? document.getElementById('diary-date').value : new Date().toISOString().split('T')[0]);
+        const date = Views.currentDiaryDate || DateUtils.todayKey();
 
         const wasActive = clickedBtn.classList.contains('active');
         document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
@@ -503,7 +507,7 @@ const App = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `hobby-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `hobby-tracker-backup-${DateUtils.todayKey()}.json`;
         a.click();
         URL.revokeObjectURL(url);
       } catch (e) {
@@ -607,7 +611,7 @@ const App = {
         }
         modal.style.display = 'none';
         await Views.loadState();
-        await Views.renderHabits();
+        await Views.renderHabits({ preserveScroll: true });
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -622,7 +626,7 @@ const App = {
         await API.deleteNote(noteId);
         modal.style.display = 'none';
         await Views.loadState();
-        Views.renderHabits();
+        Views.renderHabits({ preserveScroll: true });
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -649,7 +653,7 @@ const App = {
         }
         modal.style.display = 'none';
         await Views.loadState();
-        Views.renderHabits();
+        Views.renderHabits({ preserveScroll: true });
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -664,7 +668,7 @@ const App = {
         await API.updateHabit(habitId, { archived: !habit.archived });
         modal.style.display = 'none';
         await Views.loadState();
-        Views.renderHabits();
+        Views.renderHabits({ preserveScroll: true });
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -679,7 +683,7 @@ const App = {
         await API.deleteHabit(habitId);
         modal.style.display = 'none';
         await Views.loadState();
-        Views.renderHabits();
+        Views.renderHabits({ preserveScroll: true });
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -783,10 +787,10 @@ const App = {
   },
 
   refreshCurrentView() {
-    this.switchView(this.currentViewName);
+    this.switchView(this.currentViewName, { preserveHabitScroll: true });
   },
 
-  switchView(view) {
+  switchView(view, options = {}) {
     this.currentViewName = view;
     document.querySelectorAll('.nav-item').forEach(item => {
       item.classList.toggle('active', item.dataset.view === view);
@@ -810,7 +814,11 @@ const App = {
       Views.renderTopQuote();
     }
 
-    if (view === 'habits') Views.renderHabits();
+    if (view === 'habits') {
+      Views.renderHabits(options.preserveHabitScroll
+        ? { preserveScroll: true }
+        : { centerToday: true });
+    }
     else if (view === 'tasks') Views.renderTasks();
     else if (view === 'diary') Views.renderDiary();
     else if (view === 'settings') Views.renderSettings();

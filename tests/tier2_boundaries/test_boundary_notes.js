@@ -8,7 +8,9 @@ describe('Tier 2: Boundary & Corner Cases — Notes & Cells (R3)', () => {
   let env;
 
   beforeEach(async () => {
-    env = await bootApp({ systemDate: '2026-11-13T23:59:59.000Z' });
+    // Use local-time fixtures (no trailing Z) so this boundary test means
+    // local midnight regardless of the machine's timezone.
+    env = await bootApp({ systemDate: '2026-11-13T23:59:59' });
     await env.unlockVault('TestPassword123!');
     env.switchView('habits');
   });
@@ -46,7 +48,7 @@ describe('Tier 2: Boundary & Corner Cases — Notes & Cells (R3)', () => {
     );
 
     // 3. Advance clock by 2 seconds across midnight boundary to 2026-11-14 00:00:01
-    env.setSystemDate('2026-11-14T00:00:01.000Z');
+    env.setSystemDate('2026-11-14T00:00:01');
     await env.Views.renderHabits();
 
     const newTodayCell = env.document.querySelector(`.day-cell[data-habit="${habit.id}"][data-date="${tomorrowStr}"]`);

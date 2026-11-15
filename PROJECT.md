@@ -29,6 +29,10 @@
 | 17 | Client-Side Encryption | AES-256-GCM zero-knowledge client-side encryption of habits, tasks, notes, diary entries before sync and encrypted backup export/import | M5 | R5 |
 | 18 | E2E Testing Suite (Tiers 1-4) | Comprehensive opaque-box test suite verifying all requirements | E2E Track | All |
 | 19 | Adversarial Coverage Hardening | White-box stress testing and edge-case validation | Final Milestone | All |
+| 20 | Infinite Habit Timeline | Extend the horizontal habit grid by 21-day chunks as the user reaches either edge, with scroll anchoring, a visible date-range label, and a jump-to-date picker | M7 | UX Fix |
+| 21 | Non-overlapping Collapsed Topbar | Replace the fixed floating expand button with an in-flow topbar so the menu control can never cover the quote banner | M7 | UX Fix |
+| 22 | Local-time Calendar Correctness | Central `DateUtils` helpers keep today keys, streaks, diary navigation, and future-date checks aligned with the device's local calendar | M7 | UX Fix |
+| 23 | Endless Diary Month/Year Navigation | Rebuild the year picker around the selected year so month navigation can continue indefinitely in both directions | M7 | UX Fix |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -40,6 +44,7 @@
 | M5 | Encrypted Cloud Sync & Cryptographic Fixes | PIN key-wrapping fix, encrypted sync interface, encrypted backup export/import, zero plaintext transmission | M1, M2, M3, M4 | PLANNED |
 | E2E | E2E Test Suite Creation | Test infrastructure, automated runner, and test cases across Tiers 1-4 | none | DONE |
 | M6 | Final Milestone: 100% E2E Pass & Adversarial Hardening | Phase 1: Pass 100% E2E tests (Tiers 1-4); Phase 2: Adversarial coverage hardening (Tier 5) | M1, M2, M3, M4, M5, E2E | PLANNED |
+| M7 | UX, Timeline & Calendar Polish | Infinite habit timeline, non-overlapping collapsed topbar, local-time date consistency, endless diary year navigation | M1-M5 | DONE |
 
 ## Interface Contracts
 ### App Shell ↔ Views
@@ -51,6 +56,9 @@
 - `Storage.createNote(noteData)`: Must accept `{ habitId, date, type, text }`. Must update `state.cells[`${habitId}|${date}`].noteId = note.id`. Returns created note.
 - `Storage.deleteNote(id)`: Removes note from `state.notes` and clears `noteId` from any corresponding cell in `state.cells`.
 - `Storage.setHabitStatus(habitId, date, status)`: Validates that `date <= todayStr` before setting status.
+- `Views.renderHabits(options)`: Browser timeline renderer. `preserveScroll` keeps the date range and horizontal position after cell edits; `centerToday` scrolls today into view on first load. Without real layout (test DOM), it renders exactly 30 columns.
+- `Views.scrollHabitGridToDate(dateKey)`: Centres any date in the habit timeline, rebuilding the range when the date lies outside the loaded window.
+- `#habit-range-label` and `#habit-jump-date`: Show the loaded range and allow direct jumps; the range grows by 21-day chunks at either edge.
 - `Habit Object`: `{ id, name, icon, color, archived, createdAt, updatedAt }`. Color must be rendered on `.habit-icon` and `.cell-status.done`.
 
 ### Storage ↔ Diary

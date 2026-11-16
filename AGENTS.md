@@ -57,9 +57,10 @@ When in doubt about whether something is a "fix/polish" or a "new feature", ask.
 2. Make focused changes rather than broad rewrites.
 3. Run `node tests/runner.js` and keep all 75 tests passing.
 4. Mirror changed root files into `public/` after edits.
-5. Update `PROJECT.md` when architecture, features, or contracts change.
-6. Commit and push verified changes to the remote repository (`git push origin main`) so GitHub Pages deploys the live updates immediately.
-7. Explain what changed, why, and anything the user should verify on Windows and
+5. Visually and functionally verify UI changes in a live browser (start `node server.js` locally, test interactions, and verify the rendered view/screenshots) before pushing.
+6. Update `PROJECT.md` when architecture, features, or contracts change.
+7. Commit and push verified changes to the remote repository (`git push origin main`) so GitHub Pages deploys the live updates immediately.
+8. Explain what changed, why, and anything the user should verify on Windows and
    Android.
 
 ## Product defaults

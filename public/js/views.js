@@ -223,12 +223,12 @@ const Views = {
       const habitColor = habit.color || '#3fa34d';
       const streak = this.calculateStreak(habit.id);
 
-      html += `<tr class="habit-row" data-habit-row="${habit.id}">`;
-      html += `<td class="habit-label" data-habit="${habit.id}">
+      html += `<tr class="habit-row" data-habit-row="${habit.id}" style="--habit-color: ${habitColor}">`;
+      html += `<td class="habit-label" data-habit="${habit.id}" style="border-left: 4px solid ${habitColor}; background: linear-gradient(90deg, ${habitColor}14 0%, transparent 80%);">
         <div class="habit-label-content">
+          <span class="habit-streak ${streak > 0 ? 'active' : 'zero'}" title="${streak} day streak">🔥 ${streak}</span>
           <span class="habit-icon" style="color: ${habitColor}">${habit.icon || '●'}</span>
-          <span class="habit-name">${this.escapeHtml(habit.name)}</span>
-          <span class="streak-badge" title="Current streak">${streak}</span>
+          <span class="habit-name" style="color: ${habitColor}">${this.escapeHtml(habit.name)}</span>
           <button type="button" class="habit-delete-row-btn" data-habit-id="${habit.id}" title="Delete Habit">🗑️</button>
         </div>
       </td>`;
@@ -244,7 +244,7 @@ const Views = {
         let statusStyle = '';
         if (status === 'done') {
           statusIcon = '✓';
-          statusStyle = `style="background-color: ${habitColor}; border-color: ${habitColor};"`;
+          statusStyle = `style="background-color: ${habitColor}; border-color: ${habitColor}; color: #ffffff;"`;
         } else if (status === 'missed') {
           statusIcon = '✗';
         }
@@ -361,6 +361,16 @@ const Views = {
         } catch (err) {
           console.error('Error updating cell status:', err);
         }
+      });
+
+      // Prevent browser text-selection / action menu on rapid double-clicks
+      cell.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      cell.addEventListener('mousedown', (e) => {
+        if (e.detail > 1) e.preventDefault();
       });
 
       // Right-click directly toggles Missed (Cross Mark ✗)
@@ -803,7 +813,8 @@ const Views = {
     tasks.forEach(task => {
       const isDone = task.status === 'done';
       html += `
-        <div class="task-item ${isDone ? 'done' : ''}" data-task-id="${task.id}" data-task-status="${task.status || 'pending'}">
+        <div class="task-item ${isDone ? 'done' : ''}" data-task-id="${task.id}" data-task-status="${task.status || 'pending'}" draggable="true">
+          <div class="task-drag-handle" title="Hold and drag to reorder" aria-label="Hold and drag to reorder">⠿</div>
           <div class="task-item-left">
             <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" ${isDone ? 'checked' : ''}>
             <span class="task-title ${isDone ? 'completed' : ''}">${this.escapeHtml(task.title)}</span>
@@ -818,6 +829,131 @@ const Views = {
       `;
     });
     container.innerHTML = html;
+
+    // Prevent double-click text selection / context menu on tasks & checkboxes
+    container.querySelectorAll('.task-item, .task-checkbox, .task-title, .task-item-left').forEach(el => {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      el.addEventListener('mousedown', (e) => {
+        if (e.detail > 1) e.preventDefault();
+      });
+    });
+
+    // Wire Smooth Drag & Drop Reordering (Desktop & Mobile Touch)
+    let draggedItem = null;
+    const taskItems = container.querySelectorAll('.task-item');
+
+    taskItems.forEach(item => {
+      // Desktop HTML5 drag
+      item.addEventListener('dragstart', (e) => {
+        draggedItem = item;
+        item.classList.add('task-dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', item.dataset.taskId);
+        }
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('task-dragging');
+        container.querySelectorAll('.task-item').forEach(el => {
+          el.classList.remove('task-drag-over-top', 'task-drag-over-bottom');
+        });
+        draggedItem = null;
+      });
+
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!draggedItem || draggedItem === item) return;
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+
+        const rect = item.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+          item.classList.add('task-drag-over-top');
+          item.classList.remove('task-drag-over-bottom');
+        } else {
+          item.classList.add('task-drag-over-bottom');
+          item.classList.remove('task-drag-over-top');
+        }
+      });
+
+      item.addEventListener('dragleave', () => {
+        item.classList.remove('task-drag-over-top', 'task-drag-over-bottom');
+      });
+
+      item.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!draggedItem || draggedItem === item) return;
+
+        const rect = item.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const insertBefore = e.clientY < midY;
+
+        item.classList.remove('task-drag-over-top', 'task-drag-over-bottom');
+
+        if (insertBefore) {
+          container.insertBefore(draggedItem, item);
+        } else {
+          container.insertBefore(draggedItem, item.nextSibling);
+        }
+
+        const newOrderedIds = Array.from(container.querySelectorAll('.task-item'))
+          .map(el => el.dataset.taskId)
+          .filter(Boolean);
+
+        await API.reorderTasks(newOrderedIds);
+        await this.loadState();
+      });
+
+      // Mobile Touch Hold-and-Drag
+      let touchStartY = 0;
+      let isTouchDragging = false;
+
+      item.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.task-checkbox, .task-item-actions')) return;
+        touchStartY = e.touches[0].clientY;
+        draggedItem = item;
+      }, { passive: true });
+
+      item.addEventListener('touchmove', (e) => {
+        if (!draggedItem || draggedItem !== item) return;
+        const currentY = e.touches[0].clientY;
+        if (Math.abs(currentY - touchStartY) > 10) {
+          isTouchDragging = true;
+          item.classList.add('task-dragging');
+        }
+        if (isTouchDragging) {
+          if (e.cancelable) e.preventDefault();
+          const targetEl = document.elementFromPoint(e.touches[0].clientX, currentY);
+          const targetItem = targetEl && targetEl.closest('.task-item');
+          if (targetItem && targetItem !== item) {
+            const rect = targetItem.getBoundingClientRect();
+            if (currentY < rect.top + rect.height / 2) {
+              container.insertBefore(item, targetItem);
+            } else {
+              container.insertBefore(item, targetItem.nextSibling);
+            }
+          }
+        }
+      }, { passive: false });
+
+      item.addEventListener('touchend', async () => {
+        if (isTouchDragging) {
+          item.classList.remove('task-dragging');
+          isTouchDragging = false;
+          draggedItem = null;
+          const newOrderedIds = Array.from(container.querySelectorAll('.task-item'))
+            .map(el => el.dataset.taskId)
+            .filter(Boolean);
+          await API.reorderTasks(newOrderedIds);
+          await this.loadState();
+        }
+      });
+    });
 
     // Attach checkbox handlers
     container.querySelectorAll('.task-checkbox').forEach(cb => {

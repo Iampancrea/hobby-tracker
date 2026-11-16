@@ -106,8 +106,8 @@
         <button id="sidebar-close-btn" class="btn btn-icon mobile-only" title="Close Menu">&times;</button>
       </div>
 
-      <!-- Sync Status Widget -->
-      <div class="sidebar-sync-widget">
+      <!-- Sync Status Widget (hidden from sidebar; sync is in Settings) -->
+      <div class="sidebar-sync-widget" style="display:none !important;">
         <div id="sidebar-sync-indicator" class="sync-badge">
           <span class="sync-dot"></span>
           <span class="sync-label">Offline Ready</span>
@@ -195,7 +195,7 @@
         <div class="note-tray-bar" id="note-tray-bar">
           <div class="note-tray-header">
             <span class="note-tray-title">🏷️ Note Tray:</span>
-            <span class="note-tray-desc">Drag any note badge onto a day's cell to attach a reason (e.g. out of town)</span>
+            <span class="note-tray-desc">Click or drag any note badge onto a day's cell to attach a note</span>
           </div>
           <div class="note-tray-items">
             <div class="note-tray-pill pill-default" draggable="true" data-note-type="default" title="Drag to cell or click to stamp">
@@ -204,11 +204,11 @@
             </div>
             <div class="note-tray-pill pill-love" draggable="true" data-note-type="love" title="Drag to cell or click to stamp">
               <span class="pill-dot badge-love"></span>
-              <span class="pill-name">Love Mode ❤️</span>
+              <span class="pill-name">Love Note 💖</span>
             </div>
             <div class="note-tray-pill pill-discipline" draggable="true" data-note-type="discipline" title="Drag to cell or click to stamp">
               <span class="pill-dot badge-discipline"></span>
-              <span class="pill-name">Discipline Mode ⚡</span>
+              <span class="pill-name">Discipline Note ⚡</span>
             </div>
           </div>
         </div>
@@ -427,7 +427,7 @@
               Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
             </p>
             <div class="update-info-row">
-              <span class="app-version-badge">Version 3.3</span>
+              <span class="app-version-badge">Version 3.4</span>
               <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
             </div>
             <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>
@@ -445,9 +445,9 @@
         <button class="modal-close">&times;</button>
       </div>
       <div class="note-type-selector">
-        <button class="note-type-btn active" data-type="default">Default</button>
-        <button class="note-type-btn" data-type="love">Love</button>
-        <button class="note-type-btn" data-type="discipline">Discipline</button>
+        <button class="note-type-btn active" data-type="default">Default Note</button>
+        <button class="note-type-btn" data-type="love">Love Note</button>
+        <button class="note-type-btn" data-type="discipline">Discipline Note</button>
       </div>
       <div class="modal-body">
         <textarea id="note-text" placeholder="Write your note..."></textarea>

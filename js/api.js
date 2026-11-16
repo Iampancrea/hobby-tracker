@@ -72,6 +72,10 @@ const API = {
     return Storage.updateTask(id, updates);
   },
 
+  async reorderTasks(orderedIds) {
+    return Storage.reorderTasks(orderedIds);
+  },
+
   async markTask(id, date, status) {
     return Storage.markTask(id, date, status);
   },

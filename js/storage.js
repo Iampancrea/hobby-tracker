@@ -232,6 +232,10 @@ const Storage = {
       }
     }
 
+    if (pin) {
+      sessionStorage.setItem('ht_session_pin', pin);
+    }
+
     await this.setUnlocked(true, masterPassword);
     return { success: true };
   },
@@ -246,9 +250,13 @@ const Storage = {
       this._cachedPassword = password;
       sessionStorage.setItem('ht_vault_key', password);
     }
-    if (!status) {
+    if (status) {
+      sessionStorage.setItem('ht_session_unlocked', '1');
+    } else {
       this._cachedPassword = null;
       sessionStorage.removeItem('ht_vault_key');
+      sessionStorage.removeItem('ht_session_unlocked');
+      sessionStorage.removeItem('ht_session_pin');
     }
   },
 
@@ -257,6 +265,10 @@ const Storage = {
     const stored = sessionStorage.getItem('ht_vault_key');
     if (stored) {
       this._cachedPassword = stored;
+      this._unlocked = true;
+      return true;
+    }
+    if (sessionStorage.getItem('ht_session_unlocked') === '1') {
       this._unlocked = true;
       return true;
     }
@@ -555,6 +567,26 @@ const Storage = {
     task.updatedAt = new Date().toISOString();
     await this.saveRawState(state);
     return task;
+  },
+
+  async reorderTasks(orderedIds) {
+    const state = await this.getState();
+    if (!state.tasks || !Array.isArray(state.tasks)) return [];
+    const taskMap = new Map(state.tasks.map(t => [t.id, t]));
+    const reordered = [];
+    for (const id of orderedIds) {
+      const task = taskMap.get(id);
+      if (task) {
+        reordered.push(task);
+        taskMap.delete(id);
+      }
+    }
+    for (const remaining of taskMap.values()) {
+      reordered.push(remaining);
+    }
+    state.tasks = reordered;
+    await this.saveRawState(state);
+    return state.tasks;
   },
 
   async deleteTask(id) {

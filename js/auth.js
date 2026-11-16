@@ -87,6 +87,16 @@ const Auth = {
         if (Storage.isUnlocked()) {
           this.showApp();
         } else {
+          const sessionPin = sessionStorage.getItem('ht_session_pin');
+          if (sessionPin && this.hasPin) {
+            try {
+              await Storage.loginWithPin(sessionPin);
+              this.showApp();
+              return;
+            } catch (err) {
+              sessionStorage.removeItem('ht_session_pin');
+            }
+          }
           document.title = 'Hobby Tracker (Locked)';
           if (this.hasPin) {
             this.showPinPad();

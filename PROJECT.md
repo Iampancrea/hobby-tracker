@@ -33,18 +33,25 @@
 | 21 | Non-overlapping Collapsed Topbar | Replace the fixed floating expand button with an in-flow topbar so the menu control can never cover the quote banner | M7 | UX Fix |
 | 22 | Local-time Calendar Correctness | Central `DateUtils` helpers keep today keys, streaks, diary navigation, and future-date checks aligned with the device's local calendar | M7 | UX Fix |
 | 23 | Endless Diary Month/Year Navigation | Rebuild the year picker around the selected year so month navigation can continue indefinitely in both directions | M7 | UX Fix |
+| 24 | Love Note & Discipline Note Renaming | Rename Love/Discipline modes to Love Note and Discipline Note across tray and modal; enable touch stamp activation | M8 | UX Polish |
+| 25 | Sidebar Sync Cleanup | Hide sidebar sync status box to reduce visual clutter; keep sync accessible in Settings | M8 | UX Polish |
+| 26 | Background Update Check | Check for updates asynchronously without hard page reload or wiping vault unlock session | M8 | Reliability |
+| 27 | Streak Flame & Habit Color Styling | Replace old 0 badge with `🔥 [streak]` before habit name; apply chosen color to habit label, icon, text, and completed cells | M8 | Feature |
+| 28 | Draggable Tasks Checklist | Smooth drag-and-drop task reordering with desktop mouse and mobile touch hold-and-drag | M8 | Feature |
+| 29 | Double-Click Popup Elimination | Prevent browser text selection / context callout menu on rapid double clicking of checkboxes and habit cells | M8 | UX Polish |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | M1 | Shell, PWA Desktop Identity & Controls | Quote banner relocation, Exit button removal, manifest & Task Manager title, dual folder parity | none | DONE |
 | M2 | Habits 30-Day Grid, Cell Marking, Notes & Bug Fixes | 30-day grid, local date logic, future cell disabling, habit colors, alert spam fix, categorized cell notes | M1 | DONE |
-| M3 | Diary Redesign, Date Picker Sidebar & Mood Selector | Left sidebar calendar navigation (past dates/years), mood selector click/visual/persistence, diary data integrity | M1 | IN_PROGRESS |
-| M4 | Revamped Dedicated Tasks View | Dedicated task checklist modeled on diary checklist, interactive checkboxes, task management | M1 | PLANNED |
-| M5 | Encrypted Cloud Sync & Cryptographic Fixes | PIN key-wrapping fix, encrypted sync interface, encrypted backup export/import, zero plaintext transmission | M1, M2, M3, M4 | PLANNED |
+| M3 | Diary Redesign, Date Picker Sidebar & Mood Selector | Left sidebar calendar navigation (past dates/years), mood selector click/visual/persistence, diary data integrity | M1 | DONE |
+| M4 | Revamped Dedicated Tasks View | Dedicated task checklist modeled on diary checklist, interactive checkboxes, task management | M1 | DONE |
+| M5 | Encrypted Cloud Sync & Cryptographic Fixes | PIN key-wrapping fix, encrypted sync interface, encrypted backup export/import, zero plaintext transmission | M1, M2, M3, M4 | DONE |
 | E2E | E2E Test Suite Creation | Test infrastructure, automated runner, and test cases across Tiers 1-4 | none | DONE |
-| M6 | Final Milestone: 100% E2E Pass & Adversarial Hardening | Phase 1: Pass 100% E2E tests (Tiers 1-4); Phase 2: Adversarial coverage hardening (Tier 5) | M1, M2, M3, M4, M5, E2E | PLANNED |
+| M6 | Final Milestone: 100% E2E Pass & Adversarial Hardening | Phase 1: Pass 100% E2E tests (Tiers 1-4); Phase 2: Adversarial coverage hardening (Tier 5) | M1, M2, M3, M4, M5, E2E | DONE |
 | M7 | UX, Timeline & Calendar Polish | Infinite habit timeline, non-overlapping collapsed topbar, local-time date consistency, endless diary year navigation | M1-M5 | DONE |
+| M8 | Polish, Draggable Tasks & Streak Engine | Love/Discipline Note renaming, sidebar cleanup, seamless update check, flame streak system, full habit color styling, draggable tasks, rapid click popup removal | M1-M7 | DONE |
 
 ## Interface Contracts
 ### App Shell ↔ Views

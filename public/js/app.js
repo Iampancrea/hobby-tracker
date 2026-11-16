@@ -162,6 +162,13 @@ const App = {
       if (!res.success && res.reason === 'not_configured') {
         this.switchView('settings');
         alert('Please configure your GitHub Personal Access Token in Settings to enable Cloud Sync.');
+      } else if (!res.success && res.reason === 'locked') {
+        this.switchView('settings');
+        const syncMsg = document.getElementById('sync-settings-msg');
+        if (syncMsg) {
+          this.showSyncMasterPasswordPrompt(syncMsg);
+          syncMsg.scrollIntoView({ behavior: 'smooth' });
+        }
       }
     };
 
@@ -398,6 +405,8 @@ const App = {
             if (res.success) {
               syncMsg.innerHTML = '<span style="color:var(--primary);">✓ Successfully connected and synced with GitHub Private Gist!</span>';
               Views.renderSettings();
+            } else if (res.reason === 'locked') {
+              this.showSyncMasterPasswordPrompt(syncMsg);
             } else {
               syncMsg.innerHTML = `<span style="color:var(--danger);">⚠️ Connection error: ${res.error || res.reason}</span>`;
             }
@@ -535,32 +544,46 @@ const App = {
       e.target.value = '';
     });
 
-    // Settings: Check for updates manually
+    // Settings: Check for updates manually without clearing login/session
     const checkUpdatesBtn = document.getElementById('check-updates-btn');
     if (checkUpdatesBtn) {
       checkUpdatesBtn.addEventListener('click', async () => {
         const msg = document.getElementById('update-status-msg');
         if (msg) {
-          msg.textContent = 'Updating cache and refreshing to latest version...';
+          msg.textContent = 'Checking for updates...';
           msg.style.display = 'block';
         }
         try {
-          if ('caches' in window) {
-            const keys = await caches.keys();
-            await Promise.all(keys.map(k => caches.delete(k)));
-          }
           if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistration === 'function') {
             const reg = await navigator.serviceWorker.getRegistration();
-            if (reg && typeof reg.update === 'function') {
-              await reg.update();
+            if (reg) {
+              if (typeof reg.update === 'function') {
+                await reg.update();
+              }
+              if (reg.waiting || reg.installing) {
+                if (msg) msg.textContent = 'New update found! Installing in background...';
+                if (reg.waiting) {
+                  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+                return;
+              }
             }
+          }
+          if (msg) {
+            msg.textContent = '✓ You are already on the latest version (v3.4)!';
+            setTimeout(() => {
+              if (msg) msg.style.display = 'none';
+            }, 3500);
           }
         } catch (err) {
           console.warn('Update check error:', err);
+          if (msg) {
+            msg.textContent = '✓ You are on the latest version.';
+            setTimeout(() => {
+              if (msg) msg.style.display = 'none';
+            }, 3000);
+          }
         }
-        setTimeout(() => {
-          window.location.reload(true);
-        }, 300);
       });
     }
 
@@ -783,6 +806,82 @@ const App = {
       if (textEl) textEl.textContent = text;
       if (dot) dot.className = `sync-dot ${dotClass}`;
       mobileBadge.title = error ? `Error: ${error}` : `Sync status: ${text}`;
+    }
+  },
+
+  showSyncMasterPasswordPrompt(syncMsg) {
+    if (!syncMsg) return;
+    syncMsg.style.display = 'block';
+    syncMsg.innerHTML = `
+      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 14px; margin-top: 10px;">
+        <div style="font-weight: 600; color: #b45309; margin-bottom: 6px; font-size: 14px;">🔐 Master Password Required for Encrypted Cloud Sync</div>
+        <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
+          You unlocked Hobby Tracker with your Quick PIN. Because all sync data is encrypted with your Master Password before sending to GitHub, please enter your Master Password once below to authorize sync (this also permanently links your PIN):
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input type="password" id="sync-unlock-password" placeholder="Enter Master Password" style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px;">
+          <button type="button" id="sync-unlock-btn" class="btn btn-primary btn-small">Authorize & Sync</button>
+        </div>
+        <div id="sync-unlock-error" style="color: var(--danger); font-size: 12px; margin-top: 8px; display: none;"></div>
+      </div>
+    `;
+
+    const unlockBtn = document.getElementById('sync-unlock-btn');
+    const unlockPass = document.getElementById('sync-unlock-password');
+    const unlockErr = document.getElementById('sync-unlock-error');
+
+    if (unlockBtn && unlockPass) {
+      const doUnlock = async () => {
+        const pass = unlockPass.value.trim();
+        if (!pass) return;
+        try {
+          const auth = await Storage.getKV('auth');
+          if (auth && auth.masterHash) {
+            const hash = await CryptoUtils.sha256(pass, auth.masterSalt);
+            if (hash !== auth.masterHash) {
+              if (unlockErr) {
+                unlockErr.textContent = 'Incorrect master password. Please try again.';
+                unlockErr.style.display = 'block';
+              }
+              return;
+            }
+          }
+
+          // Valid master password! Cache it in memory & session
+          await Storage.setUnlocked(true, pass);
+
+          // If PIN is configured, wrap it now with session PIN or current PIN
+          if (auth && auth.pinHash && auth.pinSalt) {
+            const sessionPin = sessionStorage.getItem('ht_session_pin');
+            if (sessionPin) {
+              auth.wrappedMasterKey = await CryptoUtils.encrypt({ masterPassword: pass }, sessionPin, auth.pinSalt);
+              await Storage.setKV('auth', auth);
+            }
+          }
+
+          syncMsg.innerHTML = '<span style="color:var(--primary);">✓ Master Password authorized! Syncing encrypted vault...</span>';
+          const retryRes = await Sync.syncNow();
+          if (retryRes.success) {
+            syncMsg.innerHTML = '<span style="color:var(--primary);">✓ Successfully connected and synced with GitHub Private Gist!</span>';
+            Views.renderSettings();
+          } else {
+            syncMsg.innerHTML = `<span style="color:var(--danger);">⚠️ Connection error: ${retryRes.error || retryRes.reason}</span>`;
+          }
+        } catch (e) {
+          if (unlockErr) {
+            unlockErr.textContent = 'Error: ' + e.message;
+            unlockErr.style.display = 'block';
+          }
+        }
+      };
+
+      unlockBtn.addEventListener('click', doUnlock);
+      unlockPass.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doUnlock();
+        }
+      });
     }
   },
 

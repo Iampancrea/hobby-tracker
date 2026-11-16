@@ -482,33 +482,32 @@ input, textarea {
 .streak-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 12px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
-  border: 1px solid rgba(245, 158, 11, 0.28);
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 6px;
   white-space: nowrap;
   user-select: none;
   -webkit-user-select: none;
   font-variant-numeric: tabular-nums;
-  transition: all 0.2s ease;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
 }
 
 .habit-streak.active {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.2));
+  background: #fef2f2;
   color: #dc2626;
-  border-color: rgba(239, 68, 68, 0.35);
-  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.12);
+  border: 1px solid #fecaca;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.08);
 }
 
 .habit-streak.zero {
-  opacity: 0.55;
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--text-muted);
-  border-color: transparent;
+  background: #f4f4f5;
+  color: #a1a1aa;
+  border: 1px solid #e4e4e7;
 }
 
 .day-cell {
@@ -547,23 +546,27 @@ input, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: white;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   touch-action: manipulation;
-}
-  color: white;
+  transition: transform 0.12s ease, background-color 0.12s ease;
 }
 
 .cell-status.done {
   background: var(--done);
+  color: white;
 }
 
 .cell-status.missed {
-  background: var(--missed);
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1.5px solid #f87171;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .cell-status.empty {
@@ -2097,6 +2100,7 @@ input, textarea {
 .calendar-table td.habit-label {
   min-width: 200px;
   max-width: 200px;
+  background: var(--surface) !important;
 }
 
 .calendar-table th.habit-header {
@@ -2104,19 +2108,37 @@ input, textarea {
 }
 
 .calendar-table td.habit-label {
-  z-index: 4;
-  box-shadow: 1px 0 0 var(--border), 8px 0 12px -10px rgba(0, 0, 0, 0.18);
+  z-index: 5 !important;
+  background: var(--surface) !important;
+  box-shadow: 2px 0 6px -1px rgba(0, 0, 0, 0.12), 1px 0 0 var(--border);
 }
 
 .habit-label-content {
   position: relative;
+  display: flex;
+  align-items: center;
   gap: 6px;
+  width: 100%;
   padding-right: 18px;
 }
 
 .habit-icon {
-  width: 20px;
-  font-size: 16px;
+  width: 18px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.habit-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 /* Compact, readable date headers */

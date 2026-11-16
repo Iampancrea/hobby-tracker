@@ -224,11 +224,11 @@ const Views = {
       const streak = this.calculateStreak(habit.id);
 
       html += `<tr class="habit-row" data-habit-row="${habit.id}" style="--habit-color: ${habitColor}">`;
-      html += `<td class="habit-label" data-habit="${habit.id}" style="border-left: 4px solid ${habitColor}; background: linear-gradient(90deg, ${habitColor}14 0%, transparent 80%);">
+      html += `<td class="habit-label" data-habit="${habit.id}" style="border-left: 4px solid ${habitColor}; background: var(--surface);">
         <div class="habit-label-content">
           <span class="habit-streak ${streak > 0 ? 'active' : 'zero'}" title="${streak} day streak">🔥 ${streak}</span>
           <span class="habit-icon" style="color: ${habitColor}">${habit.icon || '●'}</span>
-          <span class="habit-name" style="color: ${habitColor}">${this.escapeHtml(habit.name)}</span>
+          <span class="habit-name">${this.escapeHtml(habit.name)}</span>
           <button type="button" class="habit-delete-row-btn" data-habit-id="${habit.id}" title="Delete Habit">🗑️</button>
         </div>
       </td>`;

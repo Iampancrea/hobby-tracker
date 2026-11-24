@@ -47,6 +47,7 @@ const Storage = {
     cells: {},
     notes: [],
     tasks: [],
+    goals: [],
     diary: {},
     quotes: [
       { id: 'q_seed_1', text: 'Discipline is choosing what you want most over what you want now.', author: 'Unknown', custom: false, updatedAt: new Date().toISOString() },
@@ -57,7 +58,8 @@ const Storage = {
       habits: {},
       tasks: {},
       notes: {},
-      quotes: {}
+      quotes: {},
+      goals: {}
     },
     lastModifiedAt: new Date().toISOString()
   },
@@ -334,6 +336,7 @@ const Storage = {
       ...state,
       habits: (state.habits || []).filter(h => !h._deleted),
       tasks: (state.tasks || []).filter(t => !t._deleted),
+      goals: (state.goals || []).filter(g => !g._deleted),
       notes: (state.notes || []).filter(n => !n._deleted),
       quotes: (state.quotes || []).filter(q => !q._deleted)
     };
@@ -641,6 +644,68 @@ const Storage = {
     if (!state.tombstones) state.tombstones = {};
     if (!state.tombstones.quotes) state.tombstones.quotes = {};
     state.tombstones.quotes[id] = new Date().toISOString();
+    await this.saveRawState(state);
+    return { success: true };
+  },
+
+  // Goals
+  async createGoal(goalData) {
+    const state = await this.getState();
+    if (!state.goals) state.goals = [];
+    const now = new Date().toISOString();
+    const goal = {
+      id: 'g_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      title: goalData.title || '',
+      category: goalData.category || 'quick', // 'quick' | 'mid' | 'long'
+      tag: goalData.tag || 'General',
+      targetDate: goalData.targetDate || '',
+      progress: Number(goalData.progress) || 0,
+      status: goalData.status || 'active', // 'active' | 'completed' | 'archived'
+      description: goalData.description || '',
+      milestones: Array.isArray(goalData.milestones) ? goalData.milestones : [],
+      createdAt: now,
+      updatedAt: now
+    };
+    state.goals.push(goal);
+    await this.saveRawState(state);
+    return goal;
+  },
+
+  async updateGoal(id, updates) {
+    const state = await this.getState();
+    const goal = (state.goals || []).find(g => g.id === id);
+    if (!goal) throw new Error('Goal not found');
+    Object.assign(goal, updates, { updatedAt: new Date().toISOString() });
+    await this.saveRawState(state);
+    return goal;
+  },
+
+  async toggleGoalMilestone(id, milestoneIdx) {
+    const state = await this.getState();
+    const goal = (state.goals || []).find(g => g.id === id);
+    if (!goal) throw new Error('Goal not found');
+    if (goal.milestones && goal.milestones[milestoneIdx]) {
+      goal.milestones[milestoneIdx].done = !goal.milestones[milestoneIdx].done;
+      const total = goal.milestones.length;
+      const doneCount = goal.milestones.filter(m => m.done).length;
+      goal.progress = total > 0 ? Math.round((doneCount / total) * 100) : (goal.milestones[milestoneIdx].done ? 100 : 0);
+      if (goal.progress === 100 && goal.status === 'active') {
+        goal.status = 'completed';
+      } else if (goal.progress < 100 && goal.status === 'completed') {
+        goal.status = 'active';
+      }
+      goal.updatedAt = new Date().toISOString();
+      await this.saveRawState(state);
+    }
+    return goal;
+  },
+
+  async deleteGoal(id) {
+    const state = await this.getState();
+    state.goals = (state.goals || []).filter(g => g.id !== id);
+    if (!state.tombstones) state.tombstones = {};
+    if (!state.tombstones.goals) state.tombstones.goals = {};
+    state.tombstones.goals[id] = new Date().toISOString();
     await this.saveRawState(state);
     return { success: true };
   },

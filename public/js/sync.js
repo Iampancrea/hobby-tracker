@@ -121,7 +121,8 @@ const Sync = {
       habits: { ...(local.tombstones?.habits || {}), ...(remote.tombstones?.habits || {}) },
       tasks: { ...(local.tombstones?.tasks || {}), ...(remote.tombstones?.tasks || {}) },
       notes: { ...(local.tombstones?.notes || {}), ...(remote.tombstones?.notes || {}) },
-      quotes: { ...(local.tombstones?.quotes || {}), ...(remote.tombstones?.quotes || {}) }
+      quotes: { ...(local.tombstones?.quotes || {}), ...(remote.tombstones?.quotes || {}) },
+      goals: { ...(local.tombstones?.goals || {}), ...(remote.tombstones?.goals || {}) }
     };
     merged.tombstones = tombstones;
 
@@ -264,6 +265,28 @@ const Sync = {
       }
     });
     merged.quotes = Array.from(quoteMap.values()).filter(q => !tombstones.quotes[q.id]);
+
+    // 8. Merge goals
+    const goalMap = new Map();
+    (local.goals || []).forEach(g => goalMap.set(g.id, g));
+    (remote.goals || []).forEach(remoteGoal => {
+      const deletedAt = tombstones.goals[remoteGoal.id];
+      const remoteUpdated = new Date(remoteGoal.updatedAt || remoteGoal.createdAt || 0).getTime();
+      if (deletedAt && new Date(deletedAt).getTime() >= remoteUpdated) {
+        goalMap.delete(remoteGoal.id);
+        return;
+      }
+      if (!goalMap.has(remoteGoal.id)) {
+        goalMap.set(remoteGoal.id, remoteGoal);
+      } else {
+        const localGoal = goalMap.get(remoteGoal.id);
+        const localUpdated = new Date(localGoal.updatedAt || localGoal.createdAt || 0).getTime();
+        if (remoteUpdated > localUpdated) {
+          goalMap.set(remoteGoal.id, remoteGoal);
+        }
+      }
+    });
+    merged.goals = Array.from(goalMap.values()).filter(g => !tombstones.goals[g.id]);
 
     merged.lastModifiedAt = new Date().toISOString();
     return merged;

@@ -767,6 +767,174 @@ const App = {
       }
     });
 
+    // Goal Modal and Event Handlers
+    const openGoalModal = (goalId = null, defaultCategory = 'quick') => {
+      const modal = document.getElementById('goal-modal');
+      if (!modal) return;
+      const titleInput = document.getElementById('goal-title');
+      const tagInput = document.getElementById('goal-tag');
+      const targetDateInput = document.getElementById('goal-target-date');
+      const descInput = document.getElementById('goal-description');
+      const milestonesInput = document.getElementById('goal-milestones');
+      const deleteBtn = document.getElementById('delete-goal-btn');
+      const modalTitle = document.getElementById('goal-modal-title');
+
+      modal.dataset.goalId = goalId || '';
+
+      if (goalId && Views.state && Views.state.goals) {
+        const goal = Views.state.goals.find(g => g.id === goalId);
+        if (goal) {
+          if (modalTitle) modalTitle.textContent = 'Edit Goal';
+          if (titleInput) titleInput.value = goal.title || '';
+          if (tagInput) tagInput.value = goal.tag || '';
+          if (targetDateInput) targetDateInput.value = goal.targetDate || '';
+          if (descInput) descInput.value = goal.description || '';
+          const ms = (goal.milestones || []).map(m => m.text).join('\n');
+          if (milestonesInput) milestonesInput.value = ms;
+          const radio = document.querySelector(`input[name="goal-category-radio"][value="${goal.category || 'quick'}"]`);
+          if (radio) radio.checked = true;
+          if (deleteBtn) deleteBtn.style.display = 'inline-block';
+          modal.style.display = 'flex';
+          if (titleInput) titleInput.focus();
+          return;
+        }
+      }
+
+      if (modalTitle) modalTitle.textContent = 'Add Goal';
+      if (titleInput) titleInput.value = '';
+      if (tagInput) tagInput.value = '';
+      if (targetDateInput) targetDateInput.value = '';
+      if (descInput) descInput.value = '';
+      if (milestonesInput) milestonesInput.value = '';
+      const radio = document.querySelector(`input[name="goal-category-radio"][value="${defaultCategory}"]`);
+      if (radio) radio.checked = true;
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      modal.style.display = 'flex';
+      if (titleInput) titleInput.focus();
+    };
+
+    window.openGoalModal = openGoalModal;
+
+    const addGoalBtn = document.getElementById('add-goal-btn');
+    if (addGoalBtn) {
+      addGoalBtn.addEventListener('click', () => openGoalModal());
+    }
+
+    document.querySelectorAll('.btn-propose-goal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openGoalModal(null, btn.dataset.category || 'quick');
+      });
+    });
+
+    const closeGoalModal = () => {
+      const modal = document.getElementById('goal-modal');
+      if (modal) modal.style.display = 'none';
+    };
+
+    const goalModalCloseBtn = document.getElementById('goal-modal-close');
+    if (goalModalCloseBtn) {
+      goalModalCloseBtn.addEventListener('click', closeGoalModal);
+    }
+
+    // Filter tabs in Goals
+    document.querySelectorAll('.goal-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        Views.currentGoalFilter = btn.dataset.filter;
+        Views.renderGoals();
+      });
+    });
+
+    // Save Goal
+    const saveGoalBtn = document.getElementById('save-goal-btn');
+    if (saveGoalBtn) {
+      saveGoalBtn.addEventListener('click', async () => {
+        const modal = document.getElementById('goal-modal');
+        const goalId = modal.dataset.goalId;
+        const title = document.getElementById('goal-title').value.trim();
+        if (!title) {
+          alert('Please enter a goal title');
+          return;
+        }
+        const categoryRadio = document.querySelector('input[name="goal-category-radio"]:checked');
+        const category = categoryRadio ? categoryRadio.value : 'quick';
+        const tag = document.getElementById('goal-tag').value.trim() || 'General';
+        const targetDate = document.getElementById('goal-target-date').value.trim();
+        const description = document.getElementById('goal-description').value.trim();
+        const milestoneLines = document.getElementById('goal-milestones').value
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l.length > 0);
+
+        let existingGoal = null;
+        if (goalId && Views.state && Views.state.goals) {
+          existingGoal = Views.state.goals.find(g => g.id === goalId);
+        }
+
+        const milestones = milestoneLines.map((line, idx) => {
+          let done = false;
+          if (existingGoal && existingGoal.milestones && existingGoal.milestones[idx]) {
+            if (existingGoal.milestones[idx].text === line) {
+              done = !!existingGoal.milestones[idx].done;
+            }
+          }
+          return { id: 'm_' + idx + '_' + Date.now(), text: line, done };
+        });
+
+        const total = milestones.length;
+        const doneCount = milestones.filter(m => m.done).length;
+        const progress = total > 0 ? Math.round((doneCount / total) * 100) : (existingGoal ? existingGoal.progress : 0);
+
+        try {
+          if (goalId) {
+            await API.updateGoal(goalId, {
+              title,
+              category,
+              tag,
+              targetDate,
+              description,
+              milestones,
+              progress
+            });
+          } else {
+            await API.createGoal({
+              title,
+              category,
+              tag,
+              targetDate,
+              description,
+              milestones,
+              progress
+            });
+          }
+          modal.style.display = 'none';
+          await Views.loadState();
+          Views.renderGoals();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
+
+    // Delete Goal
+    const deleteGoalBtn = document.getElementById('delete-goal-btn');
+    if (deleteGoalBtn) {
+      deleteGoalBtn.addEventListener('click', async () => {
+        if (!confirm('Delete this goal and all its milestones?')) return;
+        const modal = document.getElementById('goal-modal');
+        const goalId = modal.dataset.goalId;
+        if (!goalId) return;
+
+        try {
+          await API.deleteGoal(goalId);
+          modal.style.display = 'none';
+          await Views.loadState();
+          Views.renderGoals();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
+
     // Initial render
     this.switchView('habits');
   },
@@ -903,6 +1071,7 @@ const App = {
     const titles = {
       habits: 'Habits — Hobby Tracker',
       tasks: 'Tasks — Hobby Tracker',
+      goals: 'Goals — Hobby Tracker',
       diary: 'Diary — Hobby Tracker',
       settings: 'Settings — Hobby Tracker'
     };
@@ -919,6 +1088,7 @@ const App = {
         : { centerToday: true });
     }
     else if (view === 'tasks') Views.renderTasks();
+    else if (view === 'goals') Views.renderGoals();
     else if (view === 'diary') Views.renderDiary();
     else if (view === 'settings') Views.renderSettings();
   }

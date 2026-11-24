@@ -4,6 +4,7 @@ const Views = {
   currentHabitDateOffset: 0,
   currentTaskDateOffset: 0,
   currentDiaryDate: DateUtils.todayKey(),
+  currentGoalFilter: 'all',
   _activeQuote: null,
 
   // Infinite habit timeline state
@@ -1339,6 +1340,196 @@ const Views = {
     } else {
       quotesList.innerHTML = '<p style="color:#787774;">No quotes yet.</p>';
     }
+  },
+
+  // Goals view
+  async renderGoals() {
+    await this.loadState();
+    const goals = (this.state && this.state.goals) || [];
+
+    const filter = this.currentGoalFilter || 'all';
+
+    // Counts for active goals (not completed and not archived)
+    const quickActive = goals.filter(g => g.category === 'quick' && g.status !== 'archived' && g.status !== 'completed');
+    const midActive = goals.filter(g => g.category === 'mid' && g.status !== 'archived' && g.status !== 'completed');
+    const longActive = goals.filter(g => g.category === 'long' && g.status !== 'archived' && g.status !== 'completed');
+
+    // Update Summary Strip Counters
+    const quickCountEl = document.getElementById('summary-quick-count');
+    const midCountEl = document.getElementById('summary-mid-count');
+    const longCountEl = document.getElementById('summary-long-count');
+    if (quickCountEl) quickCountEl.textContent = quickActive.length;
+    if (midCountEl) midCountEl.textContent = midActive.length;
+    if (longCountEl) longCountEl.textContent = longActive.length;
+
+    // Update Badges on Columns
+    const quickBadge = document.getElementById('quick-badge');
+    const midBadge = document.getElementById('mid-badge');
+    const longBadge = document.getElementById('long-badge');
+    if (quickBadge) quickBadge.textContent = `${quickActive.length} Active`;
+    if (midBadge) midBadge.textContent = `${midActive.length} Active`;
+    if (longBadge) longBadge.textContent = `${longActive.length} Active`;
+
+    // Filter buttons visual state
+    document.querySelectorAll('.goal-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+
+    // Column visibility based on filter
+    const quickCol = document.getElementById('goal-col-quick');
+    const midCol = document.getElementById('goal-col-mid');
+    const longCol = document.getElementById('goal-col-long');
+    if (quickCol) quickCol.style.display = (filter === 'all' || filter === 'quick') ? 'flex' : 'none';
+    if (midCol) midCol.style.display = (filter === 'all' || filter === 'mid') ? 'flex' : 'none';
+    if (longCol) longCol.style.display = (filter === 'all' || filter === 'long') ? 'flex' : 'none';
+
+    // Helper to render card for a goal
+    const renderCard = (goal) => {
+      const isCompleted = goal.status === 'completed';
+      const hasMilestones = Array.isArray(goal.milestones) && goal.milestones.length > 0;
+      const totalMilestones = hasMilestones ? goal.milestones.length : 0;
+      const doneMilestones = hasMilestones ? goal.milestones.filter(m => m.done).length : 0;
+      const progressPercent = totalMilestones > 0
+        ? Math.round((doneMilestones / totalMilestones) * 100)
+        : (typeof goal.progress === 'number' ? goal.progress : (isCompleted ? 100 : 0));
+
+      let milestonesHtml = '';
+      if (hasMilestones) {
+        milestonesHtml = `
+          <div class="goal-milestones-list">
+            ${goal.milestones.map((m, idx) => `
+              <label class="goal-milestone-item ${m.done ? 'done' : ''}">
+                <input type="checkbox" class="goal-milestone-check" data-goal-id="${goal.id}" data-idx="${idx}" ${m.done ? 'checked' : ''}>
+                <span class="custom-checkbox"></span>
+                <span class="milestone-text">${this.escapeHtml(m.text || '')}</span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      const progressBarHtml = `
+        <div class="goal-progress-wrap">
+          <div class="goal-progress-meta">
+            <span class="progress-label">${hasMilestones ? `${doneMilestones} of ${totalMilestones} done` : 'Progress'}</span>
+            <span class="progress-percent">${progressPercent}%</span>
+          </div>
+          <div class="goal-progress-bar">
+            <div class="goal-progress-fill" style="width: ${progressPercent}%;"></div>
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="goal-card ${isCompleted ? 'goal-completed' : ''}" data-goal-id="${goal.id}">
+          <div class="goal-card-header">
+            <div class="goal-tags-row">
+              <span class="goal-tag-pill">${this.escapeHtml(goal.tag || 'General')}</span>
+              ${goal.targetDate ? `<span class="goal-timeline-pill">⏳ ${this.escapeHtml(goal.targetDate)}</span>` : ''}
+              ${isCompleted ? '<span class="goal-status-pill completed">✓ Done</span>' : ''}
+            </div>
+            <div class="goal-card-actions">
+              <button type="button" class="btn-goal-action btn-edit-goal" data-goal-id="${goal.id}" title="Edit Goal">✎</button>
+              <button type="button" class="btn-goal-action btn-delete-goal" data-goal-id="${goal.id}" title="Delete Goal">&times;</button>
+            </div>
+          </div>
+
+          <h3 class="goal-card-title">${this.escapeHtml(goal.title)}</h3>
+
+          ${goal.description ? `<p class="goal-card-desc">${this.escapeHtml(goal.description)}</p>` : ''}
+
+          ${progressBarHtml}
+
+          ${milestonesHtml}
+
+          <div class="goal-card-footer">
+            <button type="button" class="btn-toggle-goal-complete" data-goal-id="${goal.id}">
+              ${isCompleted ? '↺ Mark Active' : '✓ Mark Complete'}
+            </button>
+          </div>
+        </div>
+      `;
+    };
+
+    // Render Quick Goals
+    const quickList = document.getElementById('quick-goals-list');
+    if (quickList) {
+      const quickGoals = goals.filter(g => g.category === 'quick' && g.status !== 'archived');
+      if (quickGoals.length === 0) {
+        quickList.innerHTML = `<div class="goal-empty-card"><p>No quick goals yet. Set an immediate 1–7 day win to build momentum!</p></div>`;
+      } else {
+        quickList.innerHTML = quickGoals.map(renderCard).join('');
+      }
+    }
+
+    // Render Mid-Term Goals
+    const midList = document.getElementById('mid-goals-list');
+    if (midList) {
+      const midGoals = goals.filter(g => g.category === 'mid' && g.status !== 'archived');
+      if (midGoals.length === 0) {
+        midList.innerHTML = `<div class="goal-empty-card"><p>No mid-term goals yet. Anchor a 1–6 month milestone project!</p></div>`;
+      } else {
+        midList.innerHTML = midGoals.map(renderCard).join('');
+      }
+    }
+
+    // Render Long-Term Goals
+    const longList = document.getElementById('long-goals-list');
+    if (longList) {
+      const longGoals = goals.filter(g => g.category === 'long' && g.status !== 'archived');
+      if (longGoals.length === 0) {
+        longList.innerHTML = `<div class="goal-empty-card"><p>No long-term visions yet. Chart your 1–5 year guiding stars!</p></div>`;
+      } else {
+        longList.innerHTML = longGoals.map(renderCard).join('');
+      }
+    }
+
+    // Wire milestone checkboxes
+    document.querySelectorAll('.goal-milestone-check').forEach(input => {
+      input.addEventListener('change', async (e) => {
+        const goalId = e.target.dataset.goalId;
+        const idx = parseInt(e.target.dataset.idx, 10);
+        await API.toggleGoalMilestone(goalId, idx);
+        this.renderGoals();
+      });
+    });
+
+    // Wire toggle complete
+    document.querySelectorAll('.btn-toggle-goal-complete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const goalId = btn.dataset.goalId;
+        const goal = goals.find(g => g.id === goalId);
+        if (!goal) return;
+        const newStatus = goal.status === 'completed' ? 'active' : 'completed';
+        const newProgress = newStatus === 'completed' ? 100 : 0;
+        await API.updateGoal(goalId, { status: newStatus, progress: newProgress });
+        this.renderGoals();
+      });
+    });
+
+    // Wire edit goal
+    document.querySelectorAll('.btn-edit-goal').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const goalId = btn.dataset.goalId;
+        if (typeof window.openGoalModal === 'function') {
+          window.openGoalModal(goalId);
+        }
+      });
+    });
+
+    // Wire delete goal
+    document.querySelectorAll('.btn-delete-goal').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const goalId = btn.dataset.goalId;
+        if (confirm('Delete this goal?')) {
+          await API.deleteGoal(goalId);
+          this.renderGoals();
+        }
+      });
+    });
   },
 
   escapeHtml(text) {

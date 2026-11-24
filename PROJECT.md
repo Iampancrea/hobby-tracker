@@ -39,6 +39,8 @@
 | 27 | Streak Flame & Habit Color Styling | Replace old 0 badge with `🔥 [streak]` before habit name; apply chosen color to habit label, icon, text, and completed cells | M8 | Feature |
 | 28 | Draggable Tasks Checklist | Smooth drag-and-drop task reordering with desktop mouse and mobile touch hold-and-drag | M8 | Feature |
 | 29 | Double-Click Popup Elimination | Prevent browser text selection / context callout menu on rapid double clicking of checkboxes and habit cells | M8 | UX Polish |
+| 30 | Life Horizons & Goals View | 3 distinct horizon columns (Quick Goals 1-7d, Mid-Term 1-6m, Long-Term 1-5y) with interactive milestones, dynamic progress calculation, category filter tabs, summary metrics, and encrypted sync | M9 | Feature |
+| 31 | Compact Diary Calendar & Full-Page Ruled Journal | Streamline top calendar bar into a sleek, low-profile ribbon with compact mini calendar; widen diary book and expand ruled lines across the whole page with authentic red margin line and footer mood selector | M9 | UX Polish |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -52,6 +54,7 @@
 | M6 | Final Milestone: 100% E2E Pass & Adversarial Hardening | Phase 1: Pass 100% E2E tests (Tiers 1-4); Phase 2: Adversarial coverage hardening (Tier 5) | M1, M2, M3, M4, M5, E2E | DONE |
 | M7 | UX, Timeline & Calendar Polish | Infinite habit timeline, non-overlapping collapsed topbar, local-time date consistency, endless diary year navigation | M1-M5 | DONE |
 | M8 | Polish, Draggable Tasks & Streak Engine | Love/Discipline Note renaming, sidebar cleanup, seamless update check, flame streak system, full habit color styling, draggable tasks, rapid click popup removal | M1-M7 | DONE |
+| M9 | Life Horizons Goals & Authentic Journal Polish | Quick/Mid/Long Goals view with milestones, compact top calendar ribbon, full-page ruled diary with margin line | M1-M8 | DONE |
 
 ## Interface Contracts
 ### App Shell ↔ Views
@@ -76,6 +79,11 @@
 ### Storage ↔ Tasks
 - `state.tasks`: Array of task items `{ id, title, status: 'pending'|'done', archived: boolean, createdAt, updatedAt }`.
 - `Views.renderTasks()`: Renders vertical checklist with checkboxes, inline add, deletion, and filter controls.
+
+### Storage ↔ Goals & Horizons
+- `state.goals`: Array of goal items `{ id, title, category: 'quick'|'mid'|'long', tag: string, targetDate: string, progress: number, status: 'active'|'completed'|'archived', description: string, milestones: Array<{ id, text, done }>, createdAt, updatedAt }`.
+- `Views.renderGoals()`: Renders 3-horizon multi-column board (Quick 1-7d, Mid-Term 1-6m, Long-Term 1-5y) with interactive milestone checkboxes, automated progress bar calculation, filter tabs, summary metrics, and goal creation/editing modal.
+- `Storage.createGoal(data)`, `updateGoal(id, updates)`, `toggleGoalMilestone(id, index)`, `deleteGoal(id)`: Full CRUD lifecycle with tombstones (`tombstones.goals`) and client-side encrypted sync merging.
 
 ### Auth ↔ Cryptographic Sync
 - `Storage.loginWithPin(pin)`: Decrypts `auth.wrappedMasterKey` using PIN-derived key, sets `_cachedPassword` and `sessionStorage.setItem('ht_vault_key', password)` so sync functions under PIN unlock.

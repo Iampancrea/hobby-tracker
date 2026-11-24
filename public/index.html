@@ -124,6 +124,10 @@
           <span class="nav-icon">✓</span>
           <span>Tasks</span>
         </button>
+        <button class="nav-item" data-view="goals">
+          <span class="nav-icon">🎯</span>
+          <span>Goals</span>
+        </button>
         <button class="nav-item" data-view="diary">
           <span class="nav-icon">📖</span>
           <span>Diary</span>
@@ -244,6 +248,104 @@
             <div id="tasks-empty-state" class="empty-state">
               <p>No tasks yet. Add one above!</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Goals View (Life Horizons & Goals) -->
+      <div id="view-goals" class="view">
+        <div class="view-header">
+          <div class="view-title-block">
+            <h1>Goals &amp; Horizons</h1>
+            <span class="goals-subtitle">Organizing aspirations by cadence — from everyday momentum to lifelong visions</span>
+          </div>
+          <div class="goals-view-actions">
+            <div class="goals-filter-group" id="goals-filter-group">
+              <button type="button" class="goal-filter-btn active" data-filter="all">All Horizons</button>
+              <button type="button" class="goal-filter-btn" data-filter="quick">⚡ Quick (1–7d)</button>
+              <button type="button" class="goal-filter-btn" data-filter="mid">🚀 Mid-Term (1–6m)</button>
+              <button type="button" class="goal-filter-btn" data-filter="long">🌟 Long-Term (1–5y)</button>
+            </div>
+            <button type="button" id="add-goal-btn" class="btn btn-primary btn-small">+ Add Goal</button>
+          </div>
+        </div>
+
+        <!-- Goals Metric Summary Strip -->
+        <div class="goals-summary-strip">
+          <div class="goal-summary-card">
+            <div class="goal-summary-info">
+              <span class="goal-summary-label">Quick Goals</span>
+              <div class="goal-summary-value"><span id="summary-quick-count">0</span> <small>active</small></div>
+              <span class="goal-summary-hint">1–7 Day Momentum</span>
+            </div>
+            <div class="goal-summary-icon icon-quick">⚡</div>
+          </div>
+          <div class="goal-summary-card">
+            <div class="goal-summary-info">
+              <span class="goal-summary-label">Mid-Term Goals</span>
+              <div class="goal-summary-value"><span id="summary-mid-count">0</span> <small>active</small></div>
+              <span class="goal-summary-hint">1–6 Month Milestones</span>
+            </div>
+            <div class="goal-summary-icon icon-mid">🚀</div>
+          </div>
+          <div class="goal-summary-card">
+            <div class="goal-summary-info">
+              <span class="goal-summary-label">Long-Term Goals</span>
+              <div class="goal-summary-value"><span id="summary-long-count">0</span> <small>active</small></div>
+              <span class="goal-summary-hint">1–5 Year Visions</span>
+            </div>
+            <div class="goal-summary-icon icon-long">🌟</div>
+          </div>
+        </div>
+
+        <!-- 3-Column Horizon Grid -->
+        <div class="goals-horizon-grid">
+          <!-- Column 1: Quick Goals -->
+          <div class="goal-column" id="goal-col-quick">
+            <div class="goal-column-header">
+              <div class="goal-column-title-wrap">
+                <span class="goal-col-indicator indicator-quick"></span>
+                <h2>Quick Goals</h2>
+                <span class="goal-col-cadence">(1–7 Days)</span>
+              </div>
+              <span class="goal-count-badge badge-quick" id="quick-badge">0 Active</span>
+            </div>
+            <div class="goal-cards-list" id="quick-goals-list">
+              <!-- Cards rendered dynamically -->
+            </div>
+            <button type="button" class="btn-propose-goal" data-category="quick">+ Add Quick Goal</button>
+          </div>
+
+          <!-- Column 2: Mid-Term Goals -->
+          <div class="goal-column" id="goal-col-mid">
+            <div class="goal-column-header">
+              <div class="goal-column-title-wrap">
+                <span class="goal-col-indicator indicator-mid"></span>
+                <h2>Mid-Term Goals</h2>
+                <span class="goal-col-cadence">(1–6 Months)</span>
+              </div>
+              <span class="goal-count-badge badge-mid" id="mid-badge">0 Active</span>
+            </div>
+            <div class="goal-cards-list" id="mid-goals-list">
+              <!-- Cards rendered dynamically -->
+            </div>
+            <button type="button" class="btn-propose-goal" data-category="mid">+ Add Mid-Term Goal</button>
+          </div>
+
+          <!-- Column 3: Long-Term Goals -->
+          <div class="goal-column" id="goal-col-long">
+            <div class="goal-column-header">
+              <div class="goal-column-title-wrap">
+                <span class="goal-col-indicator indicator-long"></span>
+                <h2>Long-Term Goals</h2>
+                <span class="goal-col-cadence">(1–5 Years)</span>
+              </div>
+              <span class="goal-count-badge badge-long" id="long-badge">0 Active</span>
+            </div>
+            <div class="goal-cards-list" id="long-goals-list">
+              <!-- Cards rendered dynamically -->
+            </div>
+            <button type="button" class="btn-propose-goal" data-category="long">+ Add Long-Term Goal</button>
           </div>
         </div>
       </div>
@@ -427,7 +529,7 @@
               Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
             </p>
             <div class="update-info-row">
-              <span class="app-version-badge">Version 3.5</span>
+              <span class="app-version-badge">Version 3.6</span>
               <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
             </div>
             <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>
@@ -505,6 +607,62 @@
         <button id="archive-task-btn" class="btn btn-secondary" style="display:none;">Archive</button>
         <button id="delete-task-btn" class="btn btn-danger" style="display:none;">Delete</button>
         <button id="save-task-btn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goal Modal -->
+  <div id="goal-modal" class="modal" style="display:none;">
+    <div class="modal-content goal-modal-content">
+      <div class="modal-header">
+        <h2 id="goal-modal-title">Add Goal</h2>
+        <button class="modal-close" id="goal-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="goal-title">Goal Title</label>
+          <input type="text" id="goal-title" placeholder="e.g. Morning Sunlight Routine, Run 10K, Build Eco Cottage..." required>
+        </div>
+        <div class="input-group">
+          <label>Horizon / Cadence</label>
+          <div class="goal-horizon-radios">
+            <label class="goal-radio-item">
+              <input type="radio" name="goal-category-radio" value="quick" checked>
+              <span>⚡ Quick Goal (1–7 Days)</span>
+            </label>
+            <label class="goal-radio-item">
+              <input type="radio" name="goal-category-radio" value="mid">
+              <span>🚀 Mid-Term Goal (1–6 Months)</span>
+            </label>
+            <label class="goal-radio-item">
+              <input type="radio" name="goal-category-radio" value="long">
+              <span>🌟 Long-Term Goal (1–5 Years)</span>
+            </label>
+          </div>
+        </div>
+        <div class="input-row-flex">
+          <div class="input-group flex-1">
+            <label for="goal-tag">Area / Tag</label>
+            <input type="text" id="goal-tag" placeholder="e.g. Health, Career, Mindfulness, Learning">
+          </div>
+          <div class="input-group flex-1">
+            <label for="goal-target-date">Target Timeline</label>
+            <input type="text" id="goal-target-date" placeholder="e.g. This Sunday, 8 weeks left, 2026–2028">
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="goal-description">Description / Vision Notes (Optional)</label>
+          <textarea id="goal-description" rows="2" placeholder="Why does this matter? What does success feel like?"></textarea>
+        </div>
+        <div class="input-group">
+          <label for="goal-milestones">Milestones / Steps (one per line)</label>
+          <textarea id="goal-milestones" rows="3" placeholder="Drink 500ml water upon waking&#10;10-min sunlight walk&#10;No screen first 30 mins"></textarea>
+          <small class="field-hint">Each line creates an interactive checklist milestone on the goal card.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="delete-goal-btn" class="btn btn-danger" style="display:none;">Delete</button>
+        <button id="save-goal-btn" class="btn btn-primary">Save Goal</button>
       </div>
     </div>
   </div>

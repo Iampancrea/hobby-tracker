@@ -84,6 +84,23 @@ const API = {
     return Storage.deleteTask(id);
   },
 
+  // Goals
+  async createGoal(goal) {
+    return Storage.createGoal(goal);
+  },
+
+  async updateGoal(id, updates) {
+    return Storage.updateGoal(id, updates);
+  },
+
+  async toggleGoalMilestone(id, index) {
+    return Storage.toggleGoalMilestone(id, index);
+  },
+
+  async deleteGoal(id) {
+    return Storage.deleteGoal(id);
+  },
+
   // Diary
   async getDiary(date) {
     return Storage.getDiary(date);

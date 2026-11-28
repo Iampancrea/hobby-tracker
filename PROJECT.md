@@ -2,7 +2,7 @@
 
 ## Architecture
 - **Client Stack**: Vanilla JavaScript (ES6+), HTML5, CSS3 with CSS variables, Service Worker (`sw.js`). No external frontend frameworks or bundlers.
-- **Storage Layer**: Local-first IndexedDB (`HobbyTrackerVault` v1) with stores `kv` (auth config, sync config) and `state` (key `'main'`: habits, cells, notes, tasks, diary, quotes, tombstones).
+- **Storage Layer**: Local-first IndexedDB (`HobbyTrackerVault` v1) with stores `kv` (auth config, sync config) and `state` (key `'main'`: habits, cells, notes, tasks, goals, thoughts, diary, quotes, tombstones).
 - **Cryptography & Sync**: Web Crypto API (`AES-256-GCM` + `PBKDF2-SHA-256`, 100k iterations, 16-byte salt, 12-byte IV) client-side zero-knowledge encryption syncing to GitHub Private Gists (`hobby_tracker_vault.json.enc`).
 - **Server & Serving**: Node.js built-in HTTP server (`server.js`) serving static files from `public/` and optional REST API. Root files serve GitHub Pages native branch deployment.
 - **Dual Folder Discipline**: All client modifications must be synchronized identically across both root (`index.html`, `manifest.webmanifest`, `sw.js`, `css/`, `js/`, `icons/`) and `public/`.
@@ -42,6 +42,8 @@
 | 30 | Life Horizons & Goals View | 3 distinct horizon columns (Quick Goals 1-7d, Mid-Term 1-6m, Long-Term 1-5y) with interactive milestones, dynamic progress calculation, category filter tabs, summary metrics, and encrypted sync | M9 | Feature |
 | 31 | Compact Diary Calendar & Full-Page Ruled Journal | Streamline top calendar bar into a sleek, low-profile ribbon with compact mini calendar; widen diary book and expand ruled lines across the whole page with authentic red margin line and footer mood selector | M9 | UX Polish |
 | 32 | Warm Candlelit Dark Mode & Toggle | Aesthetic warm espresso/walnut dark mode with amber glow toggles across sidebar, topbars, login screen, and Settings swatch selector; includes full candlelit ruled leather-bound diary styling and zero-flash persistence | M10 | Feature |
+| 33 | Plans Master-Detail Workspace | Master-detail Plans view replacing legacy Goals board (`#view-plans`, `'goals'` aliased to `'plans'`) with Strategy & Rules, nested 1–7d Quick Goals (`parentId`), computed multi-unit progress, live Habit/Task linking & daily toggling, attached Thoughts, horizon/status filters, mobile back toggle, and orphan-safe delete cleanup | M11 | Feature |
+| 34 | Thoughts (Conclusions & Insights) | Write-first Thought composer with post-write optional title, tag, accent color (`default`/`amber`/`sage`/`rose`/`slate`), and Plan link; Re-read Spotlight (`markThoughtRead`, Next cycling); pinned-first + drag/touch reordering (`reorderThoughts`); collapsible preview/full cards, Expand/Collapse All, edit modal, and tombstone-aware encrypted sync | M11 | Feature |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -57,6 +59,7 @@
 | M8 | Polish, Draggable Tasks & Streak Engine | Love/Discipline Note renaming, sidebar cleanup, seamless update check, flame streak system, full habit color styling, draggable tasks, rapid click popup removal | M1-M7 | DONE |
 | M9 | Life Horizons Goals & Authentic Journal Polish | Quick/Mid/Long Goals view with milestones, compact top calendar ribbon, full-page ruled diary with margin line | M1-M8 | DONE |
 | M10 | Warm Candlelit Dark Mode | Tactile warm dark mode toggle across shell, login, and Settings; full candlelit espresso/walnut/sage theme | M1-M9 | DONE |
+| M11 | Plans Master-Detail & Thoughts Insights | Plans master-detail workspace, nested 1-7d quick goals, live habit/task linking, Thoughts write-first capture, Re-read Spotlight, drag reordering, sync & tombstones (`hobby-tracker-v3.8`) | M1-M10 | DONE |
 
 ## Interface Contracts
 ### App Shell ↔ Views
@@ -82,10 +85,16 @@
 - `state.tasks`: Array of task items `{ id, title, status: 'pending'|'done', archived: boolean, createdAt, updatedAt }`.
 - `Views.renderTasks()`: Renders vertical checklist with checkboxes, inline add, deletion, and filter controls.
 
-### Storage ↔ Goals & Horizons
-- `state.goals`: Array of goal items `{ id, title, category: 'quick'|'mid'|'long', tag: string, targetDate: string, progress: number, status: 'active'|'completed'|'archived', description: string, milestones: Array<{ id, text, done }>, createdAt, updatedAt }`.
-- `Views.renderGoals()`: Renders 3-horizon multi-column board (Quick 1-7d, Mid-Term 1-6m, Long-Term 1-5y) with interactive milestone checkboxes, automated progress bar calculation, filter tabs, summary metrics, and goal creation/editing modal.
-- `Storage.createGoal(data)`, `updateGoal(id, updates)`, `toggleGoalMilestone(id, index)`, `deleteGoal(id)`: Full CRUD lifecycle with tombstones (`tombstones.goals`) and client-side encrypted sync merging.
+### Storage ↔ Plans & Horizons
+- `state.goals`: Array of plan/goal items `{ id, title, category: 'quick'|'mid'|'long', tag: string, targetDate: string, progress: number, status: 'active'|'completed'|'archived', description: string, strategy: string, parentId: string|null, linkedHabitIds: string[], linkedTaskIds: string[], order: number, milestones: Array<{ id, text, done }>, createdAt, updatedAt }`.
+- `Views.renderPlans()` (aliased as `Views.renderGoals`, with `App.switchView('goals')` routing to `'plans'`): Renders master-detail `#view-plans` workspace (`.plans-list-pane` + `.plans-detail-pane`) with horizon/status filter tabs, `computePlanProgress(plan, allGoals)` factoring nested Quick Goals (`g.parentId === plan.id`) and milestones, Strategy & Rules editor, nested 1–7d Quick Goals inline composer, live Habit chips (`API.updateCell` today toggle + streak), live Task checklist (`API.updateTask` + inline create/link), Milestones, and Attached Thoughts.
+- `Storage.createGoal(data)`, `updateGoal(id, updates)`, `toggleGoalMilestone(id, index)`, `linkHabitToPlan(planId, habitId)`, `unlinkHabitFromPlan(planId, habitId)`, `linkTaskToPlan(planId, taskId)`, `unlinkTaskFromPlan(planId, taskId)`, `deleteGoal(id)` (plus matching `API.*` async wrappers): Full CRUD & linking lifecycle with `tombstones.goals` and orphan-safe cleanup (`deleteHabit`/`deleteTask` strip linked IDs from plans; `deleteGoal` resets child `parentId = null` and attached `thought.planId = null`).
+
+### Storage ↔ Thoughts
+- `state.thoughts`: Array of insight items `{ id, title: string, body: string, tag: string, color: 'default'|'amber'|'sage'|'rose'|'slate', pinned: boolean, expanded: boolean, planId: string|null, readCount: number, lastReadAt: string|null, createdAt, updatedAt }` (newest inserted at index `0`; non-empty `body` required).
+- `Storage.createThought(data)`, `updateThought(id, updates)`, `deleteThought(id)`, `reorderThoughts(orderedIds)`, `markThoughtRead(id)` (and matching `API.*` async wrappers): Full CRUD, drag/touch ordering, read-tracking (`lastReadAt`, `readCount`), and `tombstones.thoughts`.
+- `Views.renderThoughts()`, `Views.openThoughtModal(id)`: Renders Re-read Spotlight (`#thought-spotlight` with `#spotlight-read-btn` & `#spotlight-next-btn`), write-first `#thought-composer` revealing `#thought-post-write-panel` on Save (supporting optional title or Save Untitled), filter/plan/search toolbar, Expand/Collapse All, and pinned-first collapsible `.thought-card` list with desktop HTML5 + mobile touch drag handles.
+- `Sync.mergeStates(local, remote)`: Merges `tombstones.thoughts`, `state.thoughts`, and extended `state.goals` fields by `updatedAt/createdAt` while pruning tombstoned plan, habit, and task references.
 
 ### Auth ↔ Cryptographic Sync
 - `Storage.loginWithPin(pin)`: Decrypts `auth.wrappedMasterKey` using PIN-derived key, sets `_cachedPassword` and `sessionStorage.setItem('ht_vault_key', password)` so sync functions under PIN unlock.

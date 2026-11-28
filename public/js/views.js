@@ -5,6 +5,14 @@ const Views = {
   currentTaskDateOffset: 0,
   currentDiaryDate: DateUtils.todayKey(),
   currentGoalFilter: 'all',
+  currentPlanFilter: 'all',
+  selectedPlanId: null,
+  mobilePlanDetailOpen: false,
+  currentThoughtFilter: 'all',
+  currentThoughtPlanFilter: 'all',
+  currentThoughtSearch: '',
+  spotlightThoughtId: null,
+  expandedThoughtIds: new Set(),
   _activeQuote: null,
 
   // Infinite habit timeline state
@@ -1342,194 +1350,1109 @@ const Views = {
     }
   },
 
-  // Goals view
-  async renderGoals() {
+  // Plans & Quick Goals helpers
+  getHorizonMeta(category) {
+    const map = {
+      quick: { key: 'quick', icon: '⚡', label: 'Quick (1–7d)' },
+      mid: { key: 'mid', icon: '🚀', label: 'Mid-Term (1–6m)' },
+      long: { key: 'long', icon: '🌟', label: 'Long-Term (1–5y)' }
+    };
+    return map[category] || map.quick;
+  },
+
+  computePlanProgress(plan, allGoals = []) {
+    if (!plan) return 0;
+    if (plan.status === 'completed') return 100;
+
+    const milestones = Array.isArray(plan.milestones) ? plan.milestones : [];
+    const childGoals = allGoals.filter(g => g.parentId === plan.id && g.status !== 'archived');
+    const totalUnits = milestones.length + childGoals.length;
+
+    if (totalUnits === 0) {
+      return typeof plan.progress === 'number' ? plan.progress : 0;
+    }
+
+    const doneMilestones = milestones.filter(m => m.done).length;
+    let childProgressSum = 0;
+    childGoals.forEach(cg => {
+      if (cg.status === 'completed') {
+        childProgressSum += 1;
+      } else if (Array.isArray(cg.milestones) && cg.milestones.length > 0) {
+        const cgDone = cg.milestones.filter(m => m.done).length;
+        childProgressSum += cgDone / cg.milestones.length;
+      } else {
+        childProgressSum += Math.max(0, Math.min(100, Number(cg.progress) || 0)) / 100;
+      }
+    });
+
+    return Math.round(((doneMilestones + childProgressSum) / totalUnits) * 100);
+  },
+
+  populatePlanSelect(selectEl, defaultLabel, defaultValue, selectedValue) {
+    if (!selectEl) return;
+    const allGoals = (this.state && this.state.goals) || [];
+    const topPlans = allGoals.filter(g => !g.parentId && g.status !== 'archived');
+
+    let html = `<option value="${this.escapeHtml(defaultValue)}">${this.escapeHtml(defaultLabel)}</option>`;
+    topPlans.forEach(p => {
+      html += `<option value="${this.escapeHtml(p.id)}">${this.escapeHtml(p.title)}</option>`;
+    });
+    selectEl.innerHTML = html;
+
+    const hasMatch = selectedValue !== undefined && selectedValue !== null &&
+      (selectedValue === defaultValue || topPlans.some(p => p.id === selectedValue));
+    selectEl.value = hasMatch ? selectedValue : defaultValue;
+  },
+
+  // Plans view (Master-Detail workspace)
+  async renderPlans() {
     await this.loadState();
-    const goals = (this.state && this.state.goals) || [];
+    const allGoals = (this.state && this.state.goals) || [];
+    const habits = (this.state && this.state.habits) || [];
+    const tasks = (this.state && this.state.tasks) || [];
+    const thoughts = (this.state && this.state.thoughts) || [];
 
-    const filter = this.currentGoalFilter || 'all';
+    const topPlans = allGoals.filter(g => !g.parentId && g.status !== 'archived');
+    const filter = this.currentPlanFilter || 'all';
 
-    // Counts for active goals (not completed and not archived)
-    const quickActive = goals.filter(g => g.category === 'quick' && g.status !== 'archived' && g.status !== 'completed');
-    const midActive = goals.filter(g => g.category === 'mid' && g.status !== 'archived' && g.status !== 'completed');
-    const longActive = goals.filter(g => g.category === 'long' && g.status !== 'archived' && g.status !== 'completed');
-
-    // Update Summary Strip Counters
-    const quickCountEl = document.getElementById('summary-quick-count');
-    const midCountEl = document.getElementById('summary-mid-count');
-    const longCountEl = document.getElementById('summary-long-count');
-    if (quickCountEl) quickCountEl.textContent = quickActive.length;
-    if (midCountEl) midCountEl.textContent = midActive.length;
-    if (longCountEl) longCountEl.textContent = longActive.length;
-
-    // Update Badges on Columns
-    const quickBadge = document.getElementById('quick-badge');
-    const midBadge = document.getElementById('mid-badge');
-    const longBadge = document.getElementById('long-badge');
-    if (quickBadge) quickBadge.textContent = `${quickActive.length} Active`;
-    if (midBadge) midBadge.textContent = `${midActive.length} Active`;
-    if (longBadge) longBadge.textContent = `${longActive.length} Active`;
-
-    // Filter buttons visual state
-    document.querySelectorAll('.goal-filter-btn').forEach(btn => {
+    document.querySelectorAll('.plan-filter-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.filter === filter);
     });
 
-    // Column visibility based on filter
-    const quickCol = document.getElementById('goal-col-quick');
-    const midCol = document.getElementById('goal-col-mid');
-    const longCol = document.getElementById('goal-col-long');
-    if (quickCol) quickCol.style.display = (filter === 'all' || filter === 'quick') ? 'flex' : 'none';
-    if (midCol) midCol.style.display = (filter === 'all' || filter === 'mid') ? 'flex' : 'none';
-    if (longCol) longCol.style.display = (filter === 'all' || filter === 'long') ? 'flex' : 'none';
+    const filteredPlans = topPlans.filter(p => {
+      if (filter === 'active') return p.status !== 'completed';
+      if (filter === 'completed') return p.status === 'completed';
+      if (filter === 'quick' || filter === 'mid' || filter === 'long') return (p.category || 'quick') === filter;
+      return true;
+    });
 
-    // Helper to render card for a goal
-    const renderCard = (goal) => {
-      const isCompleted = goal.status === 'completed';
-      const hasMilestones = Array.isArray(goal.milestones) && goal.milestones.length > 0;
-      const totalMilestones = hasMilestones ? goal.milestones.length : 0;
-      const doneMilestones = hasMilestones ? goal.milestones.filter(m => m.done).length : 0;
-      const progressPercent = totalMilestones > 0
-        ? Math.round((doneMilestones / totalMilestones) * 100)
-        : (typeof goal.progress === 'number' ? goal.progress : (isCompleted ? 100 : 0));
+    if (filteredPlans.length === 0) {
+      this.selectedPlanId = null;
+      this.mobilePlanDetailOpen = false;
+    } else if (!this.selectedPlanId || !filteredPlans.some(p => p.id === this.selectedPlanId)) {
+      this.selectedPlanId = filteredPlans[0].id;
+    }
 
-      let milestonesHtml = '';
-      if (hasMilestones) {
-        milestonesHtml = `
-          <div class="goal-milestones-list">
-            ${goal.milestones.map((m, idx) => `
-              <label class="goal-milestone-item ${m.done ? 'done' : ''}">
-                <input type="checkbox" class="goal-milestone-check" data-goal-id="${goal.id}" data-idx="${idx}" ${m.done ? 'checked' : ''}>
-                <span class="custom-checkbox"></span>
-                <span class="milestone-text">${this.escapeHtml(m.text || '')}</span>
-              </label>
-            `).join('')}
-          </div>
-        `;
+    const selectedPlan = this.selectedPlanId
+      ? filteredPlans.find(p => p.id === this.selectedPlanId) || null
+      : null;
+
+    const workspace = document.querySelector('.plans-workspace');
+    if (workspace) {
+      workspace.classList.toggle('is-mobile-detail', !!(this.mobilePlanDetailOpen && selectedPlan));
+    }
+
+    const listEl = document.getElementById('plans-list');
+    if (listEl) {
+      if (filteredPlans.length === 0) {
+        listEl.innerHTML = '<div class="empty-state plans-empty-list"><p>No plans match this filter yet. Add a plan to get started!</p></div>';
+      } else {
+        const habitIdsSet = new Set(habits.map(h => h.id));
+        listEl.innerHTML = filteredPlans.map(plan => {
+          const isSelected = selectedPlan && plan.id === selectedPlan.id;
+          const isCompleted = plan.status === 'completed';
+          const horizon = this.getHorizonMeta(plan.category);
+          const progressPercent = this.computePlanProgress(plan, allGoals);
+          const quickCount = allGoals.filter(g => g.parentId === plan.id && g.status !== 'archived').length;
+          const habitCount = (Array.isArray(plan.linkedHabitIds) ? plan.linkedHabitIds : []).filter(id => habitIdsSet.has(id)).length;
+          const thoughtCount = thoughts.filter(t => t.planId === plan.id).length;
+
+          return `
+            <div class="plan-list-item ${isSelected ? 'active' : ''} ${isCompleted ? 'completed' : ''}" data-plan-id="${this.escapeHtml(plan.id)}" role="button" tabindex="0">
+              <div class="plan-list-item-top">
+                <span class="plan-horizon-dot horizon-${horizon.key}" title="${horizon.label}"></span>
+                <div class="plan-list-item-title">${this.escapeHtml(plan.title)}</div>
+                <span class="plan-list-item-pct">${isCompleted ? '✓ 100%' : `${progressPercent}%`}</span>
+              </div>
+              <div class="plan-list-progress-bar">
+                <div class="plan-list-progress-fill" style="width: ${progressPercent}%;"></div>
+              </div>
+              <div class="plan-list-item-meta">${quickCount} quick · ${habitCount} habits · ${thoughtCount} thoughts</div>
+            </div>
+          `;
+        }).join('');
+
+        listEl.querySelectorAll('.plan-list-item[data-plan-id]').forEach(item => {
+          const selectItem = () => {
+            this.selectedPlanId = item.dataset.planId;
+            this.mobilePlanDetailOpen = true;
+            if (workspace) workspace.classList.add('is-mobile-detail');
+            this.renderPlans();
+          };
+          item.addEventListener('click', selectItem);
+          item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              selectItem();
+            }
+          });
+        });
       }
+    }
 
-      const progressBarHtml = `
-        <div class="goal-progress-wrap">
+    const detailEl = document.getElementById('plans-detail');
+    if (detailEl) {
+      this.renderPlanDetail(detailEl, selectedPlan, { allGoals, habits, tasks, thoughts });
+    }
+  },
+
+  renderPlanDetail(detailEl, plan, ctx) {
+    if (!plan) {
+      detailEl.innerHTML = `
+        <div class="empty-state plan-detail-empty">
+          <p>Select a plan to view its strategy, 1–7 day quick goals, linked habits, tasks, and attached thoughts.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const { allGoals, habits, tasks, thoughts } = ctx;
+    const isCompleted = plan.status === 'completed';
+    const horizon = this.getHorizonMeta(plan.category);
+    const progressPercent = this.computePlanProgress(plan, allGoals);
+    const childQuickGoals = allGoals.filter(g => g.parentId === plan.id && g.status !== 'archived');
+    const milestones = Array.isArray(plan.milestones) ? plan.milestones : [];
+
+    const habitMap = new Map(habits.map(h => [h.id, h]));
+    const linkedHabitIds = Array.isArray(plan.linkedHabitIds) ? plan.linkedHabitIds : [];
+    const linkedHabits = [];
+    const linkedHabitSet = new Set();
+    linkedHabitIds.forEach(hid => {
+      if (!linkedHabitSet.has(hid) && habitMap.has(hid)) {
+        linkedHabitSet.add(hid);
+        linkedHabits.push(habitMap.get(hid));
+      }
+    });
+    const unlinkedHabits = habits.filter(h => !h.archived && !linkedHabitSet.has(h.id));
+
+    const taskMap = new Map(tasks.map(t => [t.id, t]));
+    const linkedTaskIds = Array.isArray(plan.linkedTaskIds) ? plan.linkedTaskIds : [];
+    const linkedTasks = [];
+    const linkedTaskSet = new Set();
+    linkedTaskIds.forEach(tid => {
+      if (!linkedTaskSet.has(tid) && taskMap.has(tid)) {
+        linkedTaskSet.add(tid);
+        linkedTasks.push(taskMap.get(tid));
+      }
+    });
+    const unlinkedTasks = tasks.filter(t => !t.archived && !linkedTaskSet.has(t.id));
+
+    const attachedThoughts = thoughts.filter(t => t.planId === plan.id);
+    const todayKey = DateUtils.todayKey();
+    if (!(this.expandedThoughtIds instanceof Set)) this.expandedThoughtIds = new Set();
+
+    const quickGoalsHtml = childQuickGoals.length === 0
+      ? '<p class="plan-empty-hint">No 1–7 day quick goals yet. Add an immediate target below.</p>'
+      : childQuickGoals.map(qg => {
+          const qgDone = qg.status === 'completed';
+          const qgProgress = this.computePlanProgress(qg, allGoals);
+          return `
+            <div class="plan-quick-goal-row ${qgDone ? 'completed' : ''}" data-goal-id="${this.escapeHtml(qg.id)}">
+              <label class="plan-quick-goal-label">
+                <input type="checkbox" class="plan-quick-goal-check" data-goal-id="${this.escapeHtml(qg.id)}" ${qgDone ? 'checked' : ''}>
+                <span class="plan-quick-goal-title">${this.escapeHtml(qg.title)}</span>
+              </label>
+              <div class="plan-quick-goal-meta">
+                ${qg.targetDate ? `<span class="goal-timeline-pill">⏳ ${this.escapeHtml(qg.targetDate)}</span>` : ''}
+                <span class="plan-quick-goal-progress">${qgDone ? '100%' : `${qgProgress}%`}</span>
+                <button type="button" class="btn-goal-action plan-quick-edit-btn" data-goal-id="${this.escapeHtml(qg.id)}" title="Edit Quick Goal">✎</button>
+                <button type="button" class="btn-goal-action plan-quick-delete-btn" data-goal-id="${this.escapeHtml(qg.id)}" title="Delete Quick Goal">&times;</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+    const linkedHabitsHtml = linkedHabits.length === 0
+      ? '<p class="plan-empty-hint">No habits linked yet.</p>'
+      : linkedHabits.map(h => {
+          const hColor = h.color || '#3fa34d';
+          const streak = this.calculateStreak(h.id);
+          const cellKey = `${h.id}|${todayKey}`;
+          const cell = (this.state.cells && this.state.cells[cellKey]) || {};
+          const isDoneToday = cell.status === 'done';
+          return `
+            <div class="plan-habit-chip ${isDoneToday ? 'done' : ''}" data-habit-id="${this.escapeHtml(h.id)}" style="--habit-color: ${this.escapeHtml(hColor)}">
+              <span class="plan-habit-icon" style="color: ${this.escapeHtml(hColor)}">${this.escapeHtml(h.icon || '●')}</span>
+              <span class="plan-habit-name">${this.escapeHtml(h.name)}</span>
+              <span class="plan-habit-streak">🔥 ${streak}</span>
+              <button type="button" class="plan-habit-toggle-btn ${isDoneToday ? 'done' : ''}" data-habit-id="${this.escapeHtml(h.id)}" title="${isDoneToday ? 'Done today — click to clear' : 'Mark done today'}">${isDoneToday ? '✓ Done' : 'Mark Today'}</button>
+              <button type="button" class="plan-habit-unlink-btn" data-habit-id="${this.escapeHtml(h.id)}" title="Unlink habit">&times;</button>
+            </div>
+          `;
+        }).join('');
+
+    const linkedTasksHtml = linkedTasks.length === 0
+      ? '<p class="plan-empty-hint">No tasks linked yet.</p>'
+      : linkedTasks.map(t => {
+          const isDone = t.status === 'done';
+          return `
+            <div class="plan-task-row ${isDone ? 'done' : ''}" data-task-id="${this.escapeHtml(t.id)}">
+              <label class="plan-task-check-label">
+                <input type="checkbox" class="plan-task-checkbox" data-task-id="${this.escapeHtml(t.id)}" ${isDone ? 'checked' : ''}>
+                <span class="plan-task-title ${isDone ? 'completed' : ''}">${this.escapeHtml(t.title)}</span>
+              </label>
+              <button type="button" class="plan-task-unlink-btn" data-task-id="${this.escapeHtml(t.id)}" title="Unlink task">&times;</button>
+            </div>
+          `;
+        }).join('');
+
+    const milestonesHtml = milestones.length === 0
+      ? '<p class="plan-empty-hint">No milestones yet. Edit this plan to add checklist steps.</p>'
+      : `
+        <div class="goal-milestones-list">
+          ${milestones.map((m, idx) => `
+            <label class="goal-milestone-item ${m.done ? 'done' : ''}">
+              <input type="checkbox" class="goal-milestone-check" data-goal-id="${this.escapeHtml(plan.id)}" data-idx="${idx}" ${m.done ? 'checked' : ''}>
+              <span class="custom-checkbox"></span>
+              <span class="milestone-text">${this.escapeHtml(m.text || '')}</span>
+            </label>
+          `).join('')}
+        </div>
+      `;
+
+    const attachedThoughtsHtml = attachedThoughts.length === 0
+      ? '<p class="plan-empty-hint">No thoughts attached yet. Link insights from the Thoughts view.</p>'
+      : attachedThoughts.map(t => {
+          const color = ['default', 'amber', 'sage', 'rose', 'slate'].includes(t.color) ? t.color : 'default';
+          const isExpanded = this.expandedThoughtIds.has(t.id);
+          const snippet = this.formatThoughtPreview(t.body);
+          return `
+            <div class="plan-thought-chip color-${color} ${isExpanded ? 'expanded' : ''}" data-thought-id="${this.escapeHtml(t.id)}">
+              <div class="plan-thought-chip-header">
+                <div class="plan-thought-chip-meta">
+                  ${t.pinned ? '<span class="thought-pin-badge" title="Pinned">📌</span>' : ''}
+                  ${t.title ? `<strong class="plan-thought-chip-title">${this.escapeHtml(t.title)}</strong>` : ''}
+                  ${t.tag ? `<span class="thought-tag-badge">${this.escapeHtml(t.tag)}</span>` : ''}
+                </div>
+                <div class="plan-thought-chip-actions">
+                  <button type="button" class="btn-goal-action plan-thought-expand-btn" data-thought-id="${this.escapeHtml(t.id)}" title="${isExpanded ? 'Collapse' : 'Expand'}">${isExpanded ? '▾' : '▸'}</button>
+                  <button type="button" class="btn-goal-action plan-thought-unlink-btn" data-thought-id="${this.escapeHtml(t.id)}" title="Unlink thought">&times;</button>
+                </div>
+              </div>
+              <div class="plan-thought-chip-preview" ${isExpanded ? 'style="display:none;"' : ''}>${this.escapeHtml(snippet)}</div>
+              <div class="plan-thought-chip-body" style="white-space: pre-wrap; display: ${isExpanded ? 'block' : 'none'};">${this.escapeHtml(t.body || '')}</div>
+            </div>
+          `;
+        }).join('');
+
+    detailEl.innerHTML = `
+      <div class="plan-detail-card ${isCompleted ? 'completed' : ''}" data-plan-id="${this.escapeHtml(plan.id)}">
+        <div class="plan-detail-header">
+          <div class="plan-detail-header-main">
+            <div class="goal-tags-row">
+              <span class="plan-horizon-badge horizon-${horizon.key}">${horizon.icon} ${horizon.label}</span>
+              <span class="goal-tag-pill">${this.escapeHtml(plan.tag || 'General')}</span>
+              ${plan.targetDate ? `<span class="goal-timeline-pill">⏳ ${this.escapeHtml(plan.targetDate)}</span>` : ''}
+              ${isCompleted ? '<span class="goal-status-pill completed">✓ Completed</span>' : ''}
+            </div>
+            <h2 class="plan-detail-title">${this.escapeHtml(plan.title)}</h2>
+            ${plan.description ? `<p class="plan-detail-desc">${this.escapeHtml(plan.description)}</p>` : ''}
+          </div>
+          <div class="plan-detail-header-actions">
+            <button type="button" class="btn btn-secondary btn-small plan-edit-btn" data-plan-id="${this.escapeHtml(plan.id)}">✎ Edit</button>
+            <button type="button" class="btn btn-secondary btn-small plan-toggle-complete-btn" data-plan-id="${this.escapeHtml(plan.id)}">${isCompleted ? '↺ Mark Active' : '✓ Mark Complete'}</button>
+            <button type="button" class="btn btn-danger btn-small plan-delete-btn" data-plan-id="${this.escapeHtml(plan.id)}">Delete</button>
+          </div>
+        </div>
+
+        <div class="goal-progress-wrap plan-detail-progress">
           <div class="goal-progress-meta">
-            <span class="progress-label">${hasMilestones ? `${doneMilestones} of ${totalMilestones} done` : 'Progress'}</span>
+            <span class="progress-label">Overall Progress</span>
             <span class="progress-percent">${progressPercent}%</span>
           </div>
           <div class="goal-progress-bar">
             <div class="goal-progress-fill" style="width: ${progressPercent}%;"></div>
           </div>
         </div>
-      `;
 
-      return `
-        <div class="goal-card ${isCompleted ? 'goal-completed' : ''}" data-goal-id="${goal.id}">
-          <div class="goal-card-header">
-            <div class="goal-tags-row">
-              <span class="goal-tag-pill">${this.escapeHtml(goal.tag || 'General')}</span>
-              ${goal.targetDate ? `<span class="goal-timeline-pill">⏳ ${this.escapeHtml(goal.targetDate)}</span>` : ''}
-              ${isCompleted ? '<span class="goal-status-pill completed">✓ Done</span>' : ''}
-            </div>
-            <div class="goal-card-actions">
-              <button type="button" class="btn-goal-action btn-edit-goal" data-goal-id="${goal.id}" title="Edit Goal">✎</button>
-              <button type="button" class="btn-goal-action btn-delete-goal" data-goal-id="${goal.id}" title="Delete Goal">&times;</button>
-            </div>
+        <div class="plan-section-block plan-strategy-box">
+          <div class="plan-section-header">
+            <h3>Strategy &amp; Rules</h3>
           </div>
-
-          <h3 class="goal-card-title">${this.escapeHtml(goal.title)}</h3>
-
-          ${goal.description ? `<p class="goal-card-desc">${this.escapeHtml(goal.description)}</p>` : ''}
-
-          ${progressBarHtml}
-
-          ${milestonesHtml}
-
-          <div class="goal-card-footer">
-            <button type="button" class="btn-toggle-goal-complete" data-goal-id="${goal.id}">
-              ${isCompleted ? '↺ Mark Active' : '✓ Mark Complete'}
-            </button>
+          <textarea id="plan-strategy-input" class="plan-strategy-input" rows="3" placeholder="Operating rules, weekly cadence, constraints, or principles for this plan..."></textarea>
+          <div class="plan-strategy-actions">
+            <button type="button" id="plan-strategy-save-btn" class="btn btn-primary btn-small">Save Strategy</button>
+            <span id="plan-strategy-status" class="plan-inline-status"></span>
           </div>
         </div>
-      `;
+
+        <div class="plan-section-block">
+          <div class="plan-section-header">
+            <h3>⚡ 1–7 Day Quick Goals</h3>
+            <span class="plan-section-count">${childQuickGoals.length}</span>
+          </div>
+          <div class="plan-quick-goals-list">
+            ${quickGoalsHtml}
+          </div>
+          <div class="plan-inline-add-row">
+            <input type="text" id="plan-quick-title-input" placeholder="Add a 1–7 day quick goal under this plan...">
+            <button type="button" id="plan-quick-add-btn" class="btn btn-primary btn-small">+ Add Quick Goal</button>
+          </div>
+        </div>
+
+        <div class="plan-section-block">
+          <div class="plan-section-header">
+            <h3>🔥 Linked Habits</h3>
+            <span class="plan-section-count">${linkedHabits.length}</span>
+          </div>
+          <div class="plan-linked-habits">
+            ${linkedHabitsHtml}
+          </div>
+          <div class="plan-inline-add-row">
+            <select id="plan-link-habit-select" ${unlinkedHabits.length === 0 ? 'disabled' : ''}>
+              <option value="">${unlinkedHabits.length ? 'Select a habit to link...' : 'All habits linked'}</option>
+              ${unlinkedHabits.map(h => `<option value="${this.escapeHtml(h.id)}">${this.escapeHtml((h.icon || '●') + ' ' + h.name)}</option>`).join('')}
+            </select>
+            <button type="button" id="plan-link-habit-btn" class="btn btn-secondary btn-small" ${unlinkedHabits.length === 0 ? 'disabled' : ''}>Link Habit</button>
+          </div>
+        </div>
+
+        <div class="plan-section-block">
+          <div class="plan-section-header">
+            <h3>✓ Linked Tasks</h3>
+            <span class="plan-section-count">${linkedTasks.length}</span>
+          </div>
+          <div class="plan-linked-tasks">
+            ${linkedTasksHtml}
+          </div>
+          <div class="plan-inline-add-row">
+            <select id="plan-link-task-select" ${unlinkedTasks.length === 0 ? 'disabled' : ''}>
+              <option value="">${unlinkedTasks.length ? 'Select an existing task to link...' : 'No unlinked tasks available'}</option>
+              ${unlinkedTasks.map(t => `<option value="${this.escapeHtml(t.id)}">${this.escapeHtml(t.title)}</option>`).join('')}
+            </select>
+            <button type="button" id="plan-link-task-btn" class="btn btn-secondary btn-small" ${unlinkedTasks.length === 0 ? 'disabled' : ''}>Link Task</button>
+          </div>
+          <div class="plan-inline-add-row">
+            <input type="text" id="plan-new-task-input" placeholder="Create &amp; link a new task...">
+            <button type="button" id="plan-new-task-btn" class="btn btn-primary btn-small">+ Add &amp; Link Task</button>
+          </div>
+        </div>
+
+        <div class="plan-section-block">
+          <div class="plan-section-header">
+            <h3>Milestones</h3>
+            <span class="plan-section-count">${milestones.filter(m => m.done).length}/${milestones.length}</span>
+          </div>
+          ${milestonesHtml}
+        </div>
+
+        <div class="plan-section-block">
+          <div class="plan-section-header">
+            <h3>💭 Attached Thoughts</h3>
+            <span class="plan-section-count">${attachedThoughts.length}</span>
+          </div>
+          <div class="plan-attached-thoughts">
+            ${attachedThoughtsHtml}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Set textarea/select values directly in JS for exact DOM & MockElement fidelity
+    const strategyInput = document.getElementById('plan-strategy-input');
+    if (strategyInput) strategyInput.value = plan.strategy || '';
+    const linkHabitSelect = document.getElementById('plan-link-habit-select');
+    if (linkHabitSelect) linkHabitSelect.value = '';
+    const linkTaskSelect = document.getElementById('plan-link-task-select');
+    if (linkTaskSelect) linkTaskSelect.value = '';
+
+    this.bindPlanDetailEvents(detailEl, plan);
+  },
+
+  bindPlanDetailEvents(detailEl, plan) {
+    const editBtn = detailEl.querySelector('.plan-edit-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        if (typeof window.openGoalModal === 'function') {
+          window.openGoalModal(plan.id);
+        }
+      });
+    }
+
+    const toggleCompleteBtn = detailEl.querySelector('.plan-toggle-complete-btn');
+    if (toggleCompleteBtn) {
+      toggleCompleteBtn.addEventListener('click', async () => {
+        const newStatus = plan.status === 'completed' ? 'active' : 'completed';
+        const newProgress = newStatus === 'completed' ? 100 : 0;
+        await API.updateGoal(plan.id, { status: newStatus, progress: newProgress });
+        await this.renderPlans();
+      });
+    }
+
+    const deleteBtn = detailEl.querySelector('.plan-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (confirm(`Delete plan "${plan.title}"?`)) {
+          await API.deleteGoal(plan.id);
+          if (this.selectedPlanId === plan.id) {
+            this.selectedPlanId = null;
+            this.mobilePlanDetailOpen = false;
+          }
+          await this.renderPlans();
+        }
+      });
+    }
+
+    const strategySaveBtn = document.getElementById('plan-strategy-save-btn');
+    const strategyInput = document.getElementById('plan-strategy-input');
+    if (strategySaveBtn && strategyInput) {
+      strategySaveBtn.addEventListener('click', async () => {
+        await API.updateGoal(plan.id, { strategy: strategyInput.value });
+        await this.renderPlans();
+        const statusEl = document.getElementById('plan-strategy-status');
+        if (statusEl) statusEl.textContent = 'Saved ✓';
+      });
+    }
+
+    // Nested 1-7d Quick Goals
+    const quickAddInput = document.getElementById('plan-quick-title-input');
+    const quickAddBtn = document.getElementById('plan-quick-add-btn');
+    const addQuickGoal = async () => {
+      const title = quickAddInput ? quickAddInput.value.trim() : '';
+      if (!title) return;
+      await API.createGoal({ title, category: 'quick', parentId: plan.id });
+      if (quickAddInput) quickAddInput.value = '';
+      await this.renderPlans();
     };
-
-    // Render Quick Goals
-    const quickList = document.getElementById('quick-goals-list');
-    if (quickList) {
-      const quickGoals = goals.filter(g => g.category === 'quick' && g.status !== 'archived');
-      if (quickGoals.length === 0) {
-        quickList.innerHTML = `<div class="goal-empty-card"><p>No quick goals yet. Set an immediate 1–7 day win to build momentum!</p></div>`;
-      } else {
-        quickList.innerHTML = quickGoals.map(renderCard).join('');
-      }
+    if (quickAddBtn) quickAddBtn.addEventListener('click', addQuickGoal);
+    if (quickAddInput) {
+      quickAddInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addQuickGoal();
+        }
+      });
     }
 
-    // Render Mid-Term Goals
-    const midList = document.getElementById('mid-goals-list');
-    if (midList) {
-      const midGoals = goals.filter(g => g.category === 'mid' && g.status !== 'archived');
-      if (midGoals.length === 0) {
-        midList.innerHTML = `<div class="goal-empty-card"><p>No mid-term goals yet. Anchor a 1–6 month milestone project!</p></div>`;
-      } else {
-        midList.innerHTML = midGoals.map(renderCard).join('');
-      }
+    detailEl.querySelectorAll('.plan-quick-goal-check').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        const goalId = cb.dataset.goalId;
+        const newStatus = cb.checked ? 'completed' : 'active';
+        await API.updateGoal(goalId, { status: newStatus, progress: cb.checked ? 100 : 0 });
+        await this.renderPlans();
+      });
+    });
+
+    detailEl.querySelectorAll('.plan-quick-edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof window.openGoalModal === 'function') {
+          window.openGoalModal(btn.dataset.goalId, 'quick', plan.id);
+        }
+      });
+    });
+
+    detailEl.querySelectorAll('.plan-quick-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (confirm('Delete this quick goal?')) {
+          await API.deleteGoal(btn.dataset.goalId);
+          await this.renderPlans();
+        }
+      });
+    });
+
+    // Linked Habits
+    const todayKey = DateUtils.todayKey();
+    detailEl.querySelectorAll('.plan-habit-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const habitId = btn.dataset.habitId;
+        const cellKey = `${habitId}|${todayKey}`;
+        const cell = (this.state.cells && this.state.cells[cellKey]) || {};
+        const nextStatus = cell.status === 'done' ? 'empty' : 'done';
+        await API.updateCell(habitId, todayKey, { status: nextStatus });
+        await this.renderPlans();
+      });
+    });
+
+    detailEl.querySelectorAll('.plan-habit-unlink-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await API.unlinkHabitFromPlan(plan.id, btn.dataset.habitId);
+        await this.renderPlans();
+      });
+    });
+
+    const linkHabitBtn = document.getElementById('plan-link-habit-btn');
+    const linkHabitSelect = document.getElementById('plan-link-habit-select');
+    if (linkHabitBtn && linkHabitSelect) {
+      linkHabitBtn.addEventListener('click', async () => {
+        const habitId = linkHabitSelect.value;
+        if (!habitId) return;
+        await API.linkHabitToPlan(plan.id, habitId);
+        await this.renderPlans();
+      });
     }
 
-    // Render Long-Term Goals
-    const longList = document.getElementById('long-goals-list');
-    if (longList) {
-      const longGoals = goals.filter(g => g.category === 'long' && g.status !== 'archived');
-      if (longGoals.length === 0) {
-        longList.innerHTML = `<div class="goal-empty-card"><p>No long-term visions yet. Chart your 1–5 year guiding stars!</p></div>`;
-      } else {
-        longList.innerHTML = longGoals.map(renderCard).join('');
-      }
+    // Linked Tasks
+    detailEl.querySelectorAll('.plan-task-checkbox').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        const taskId = cb.dataset.taskId;
+        const newStatus = cb.checked ? 'done' : 'pending';
+        await API.updateTask(taskId, { status: newStatus });
+        await this.renderPlans();
+      });
+    });
+
+    detailEl.querySelectorAll('.plan-task-unlink-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await API.unlinkTaskFromPlan(plan.id, btn.dataset.taskId);
+        await this.renderPlans();
+      });
+    });
+
+    const linkTaskBtn = document.getElementById('plan-link-task-btn');
+    const linkTaskSelect = document.getElementById('plan-link-task-select');
+    if (linkTaskBtn && linkTaskSelect) {
+      linkTaskBtn.addEventListener('click', async () => {
+        const taskId = linkTaskSelect.value;
+        if (!taskId) return;
+        await API.linkTaskToPlan(plan.id, taskId);
+        await this.renderPlans();
+      });
     }
 
-    // Wire milestone checkboxes
-    document.querySelectorAll('.goal-milestone-check').forEach(input => {
+    const newTaskInput = document.getElementById('plan-new-task-input');
+    const newTaskBtn = document.getElementById('plan-new-task-btn');
+    const createAndLinkTask = async () => {
+      const title = newTaskInput ? newTaskInput.value.trim() : '';
+      if (!title) return;
+      const created = await API.createTask({ title });
+      if (created && created.id) {
+        await API.linkTaskToPlan(plan.id, created.id);
+      }
+      if (newTaskInput) newTaskInput.value = '';
+      await this.renderPlans();
+    };
+    if (newTaskBtn) newTaskBtn.addEventListener('click', createAndLinkTask);
+    if (newTaskInput) {
+      newTaskInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          createAndLinkTask();
+        }
+      });
+    }
+
+    // Milestones checklist
+    detailEl.querySelectorAll('.goal-milestone-check').forEach(input => {
       input.addEventListener('change', async (e) => {
         const goalId = e.target.dataset.goalId;
         const idx = parseInt(e.target.dataset.idx, 10);
         await API.toggleGoalMilestone(goalId, idx);
-        this.renderGoals();
+        await this.renderPlans();
       });
     });
 
-    // Wire toggle complete
-    document.querySelectorAll('.btn-toggle-goal-complete').forEach(btn => {
+    // Attached Thoughts
+    detailEl.querySelectorAll('.plan-thought-unlink-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const goalId = btn.dataset.goalId;
-        const goal = goals.find(g => g.id === goalId);
-        if (!goal) return;
-        const newStatus = goal.status === 'completed' ? 'active' : 'completed';
-        const newProgress = newStatus === 'completed' ? 100 : 0;
-        await API.updateGoal(goalId, { status: newStatus, progress: newProgress });
-        this.renderGoals();
+        await API.updateThought(btn.dataset.thoughtId, { planId: null });
+        await this.renderPlans();
       });
     });
 
-    // Wire edit goal
-    document.querySelectorAll('.btn-edit-goal').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const goalId = btn.dataset.goalId;
-        if (typeof window.openGoalModal === 'function') {
-          window.openGoalModal(goalId);
-        }
+    detailEl.querySelectorAll('.plan-thought-chip').forEach(chip => {
+      const toggleExpand = () => {
+        const tid = chip.dataset.thoughtId;
+        if (this.expandedThoughtIds.has(tid)) this.expandedThoughtIds.delete(tid);
+        else this.expandedThoughtIds.add(tid);
+        this.renderPlans();
+      };
+      const expandBtn = chip.querySelector('.plan-thought-expand-btn');
+      if (expandBtn) {
+        expandBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleExpand();
+        });
+      }
+      const header = chip.querySelector('.plan-thought-chip-header');
+      const preview = chip.querySelector('.plan-thought-chip-preview');
+      if (header) {
+        header.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return;
+          toggleExpand();
+        });
+      }
+      if (preview) {
+        preview.addEventListener('click', toggleExpand);
+      }
+    });
+  },
+
+  // Thoughts helpers & view
+  formatThoughtPreview(body) {
+    const collapsed = String(body || '').replace(/\s+/g, ' ').trim();
+    if (collapsed.length <= 180) return collapsed;
+    return collapsed.slice(0, 177).trimEnd() + '…';
+  },
+
+  pickSpotlightThought(thoughts) {
+    if (!Array.isArray(thoughts) || thoughts.length === 0) return null;
+    if (this.spotlightThoughtId) {
+      const existing = thoughts.find(t => t.id === this.spotlightThoughtId);
+      if (existing) return existing;
+    }
+
+    const sorted = thoughts.slice().sort((a, b) => {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      const aLast = a.lastReadAt || '';
+      const bLast = b.lastReadAt || '';
+      if (aLast !== bLast) return aLast < bLast ? -1 : 1;
+      return (Number(a.readCount) || 0) - (Number(b.readCount) || 0);
+    });
+    const picked = sorted[0];
+    this.spotlightThoughtId = picked ? picked.id : null;
+    return picked;
+  },
+
+  renderThoughtSpotlight(thoughts, topPlans) {
+    const spotlightEl = document.getElementById('thought-spotlight');
+    if (!spotlightEl) return;
+
+    const spotlight = this.pickSpotlightThought(thoughts);
+    if (!spotlight) {
+      spotlightEl.innerHTML = `
+        <div class="spotlight-empty">
+          <span class="spotlight-kicker">✨ Spotlight</span>
+          <p>Write your first conclusion or insight below. Your pinned and least-recently-read thoughts will resurface here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const planMap = new Map(topPlans.map(p => [p.id, p]));
+    const linkedPlan = spotlight.planId ? planMap.get(spotlight.planId) : null;
+    const readCount = Number(spotlight.readCount) || 0;
+
+    spotlightEl.innerHTML = `
+      <div class="spotlight-top-row">
+        <span class="spotlight-kicker">✨ Worth Re-reading</span>
+        <div class="spotlight-badges">
+          ${spotlight.pinned ? '<span class="thought-pin-badge">📌 Pinned</span>' : ''}
+          ${spotlight.tag ? `<span class="thought-tag-badge">${this.escapeHtml(spotlight.tag)}</span>` : ''}
+          ${linkedPlan ? `<span class="thought-plan-badge">🎯 ${this.escapeHtml(linkedPlan.title)}</span>` : ''}
+          <span class="spotlight-read-count">Read ${readCount}×</span>
+        </div>
+      </div>
+      ${spotlight.title ? `<h3 class="spotlight-title">${this.escapeHtml(spotlight.title)}</h3>` : ''}
+      <div class="spotlight-body" style="white-space: pre-wrap;">${this.escapeHtml(spotlight.body || '')}</div>
+      <div class="spotlight-actions">
+        <button type="button" id="spotlight-read-btn" class="btn btn-primary btn-small">✓ Mark Read</button>
+        <button type="button" id="spotlight-next-btn" class="btn btn-secondary btn-small" ${thoughts.length < 2 ? 'disabled' : ''}>Next Thought →</button>
+      </div>
+    `;
+
+    const readBtn = document.getElementById('spotlight-read-btn');
+    if (readBtn) {
+      readBtn.addEventListener('click', async () => {
+        await API.markThoughtRead(spotlight.id);
+        await this.renderThoughts();
       });
+    }
+
+    const nextBtn = document.getElementById('spotlight-next-btn');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (thoughts.length < 2) return;
+        const currentIdx = thoughts.findIndex(t => t.id === spotlight.id);
+        const nextThought = thoughts[(currentIdx + 1) % thoughts.length];
+        this.spotlightThoughtId = nextThought.id;
+        this.renderThoughtSpotlight(thoughts, topPlans);
+      });
+    }
+  },
+
+  computeReorderedThoughtIds(visibleOrderedIds, allThoughts) {
+    if (!Array.isArray(allThoughts) || allThoughts.length === 0) return visibleOrderedIds;
+    if (visibleOrderedIds.length === allThoughts.length) return visibleOrderedIds;
+
+    const visibleSet = new Set(visibleOrderedIds);
+    let cursor = 0;
+    return allThoughts.map(t => {
+      if (visibleSet.has(t.id)) {
+        const nextId = visibleOrderedIds[cursor];
+        cursor++;
+        return nextId;
+      }
+      return t.id;
+    });
+  },
+
+  async renderThoughts() {
+    await this.loadState();
+    const thoughts = (this.state && this.state.thoughts) || [];
+    const allGoals = (this.state && this.state.goals) || [];
+    const topPlans = allGoals.filter(g => !g.parentId && g.status !== 'archived');
+
+    if (!(this.expandedThoughtIds instanceof Set)) {
+      this.expandedThoughtIds = new Set();
+    }
+
+    const filter = this.currentThoughtFilter || 'all';
+    document.querySelectorAll('.thought-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === filter);
     });
 
-    // Wire delete goal
-    document.querySelectorAll('.btn-delete-goal').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const goalId = btn.dataset.goalId;
-        if (confirm('Delete this goal?')) {
-          await API.deleteGoal(goalId);
-          this.renderGoals();
+    if (this.currentThoughtPlanFilter && this.currentThoughtPlanFilter !== 'all') {
+      if (!topPlans.some(p => p.id === this.currentThoughtPlanFilter)) {
+        this.currentThoughtPlanFilter = 'all';
+      }
+    }
+
+    // Populate plan selects in composer, filter bar, and edit modal
+    const composerPlanSelect = document.getElementById('thought-plan-select');
+    if (composerPlanSelect) {
+      this.populatePlanSelect(composerPlanSelect, 'No linked plan', '', composerPlanSelect.value || '');
+    }
+    const planFilterSelect = document.getElementById('thoughts-plan-filter');
+    if (planFilterSelect) {
+      this.populatePlanSelect(planFilterSelect, 'All Plans', 'all', this.currentThoughtPlanFilter || 'all');
+    }
+    const editPlanSelect = document.getElementById('thought-edit-plan');
+    if (editPlanSelect) {
+      this.populatePlanSelect(editPlanSelect, 'No linked plan', '', editPlanSelect.value || '');
+    }
+
+    this.renderThoughtSpotlight(thoughts, topPlans);
+
+    const listEl = document.getElementById('thoughts-list');
+    if (!listEl) return;
+
+    const planFilter = this.currentThoughtPlanFilter || 'all';
+    const search = (this.currentThoughtSearch || '').trim().toLowerCase();
+
+    const filtered = thoughts.filter(t => {
+      if (filter === 'pinned' && !t.pinned) return false;
+      if (planFilter !== 'all' && t.planId !== planFilter) return false;
+      if (search) {
+        const hay = `${t.title || ''}\n${t.body || ''}\n${t.tag || ''}`.toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const ordered = [
+      ...filtered.filter(t => t.pinned),
+      ...filtered.filter(t => !t.pinned)
+    ];
+
+    if (ordered.length === 0) {
+      listEl.innerHTML = `
+        <div class="empty-state thoughts-empty-state">
+          <p>${thoughts.length === 0 ? 'No thoughts captured yet. Write a lesson or conclusion above!' : 'No thoughts match the current filters.'}</p>
+        </div>
+      `;
+      return;
+    }
+
+    const planMap = new Map(topPlans.map(p => [p.id, p]));
+    const colorOptions = ['default', 'amber', 'sage', 'rose', 'slate'];
+
+    listEl.innerHTML = ordered.map(t => {
+      const color = colorOptions.includes(t.color) ? t.color : 'default';
+      const isExpanded = this.expandedThoughtIds.has(t.id);
+      const linkedPlan = t.planId ? planMap.get(t.planId) : null;
+      const previewText = this.formatThoughtPreview(t.body);
+
+      return `
+        <div class="thought-card color-${color} ${t.pinned ? 'pinned' : ''} ${isExpanded ? 'expanded' : ''}" data-thought-id="${this.escapeHtml(t.id)}" draggable="true">
+          <div class="thought-card-header">
+            <div class="thought-drag-handle" title="Hold and drag to reorder" aria-label="Hold and drag to reorder">⠿</div>
+            <div class="thought-card-summary" role="button" tabindex="0">
+              <div class="thought-card-top-row">
+                <div class="thought-card-badges">
+                  ${t.pinned ? '<span class="thought-pin-badge" title="Pinned">📌</span>' : ''}
+                  ${t.title ? `<span class="thought-card-title">${this.escapeHtml(t.title)}</span>` : ''}
+                  ${t.tag ? `<span class="thought-tag-badge">${this.escapeHtml(t.tag)}</span>` : ''}
+                  ${linkedPlan ? `<span class="thought-plan-badge">🎯 ${this.escapeHtml(linkedPlan.title)}</span>` : ''}
+                </div>
+              </div>
+              <div class="thought-card-preview" ${isExpanded ? 'style="display:none;"' : ''}>${this.escapeHtml(previewText)}</div>
+            </div>
+            <button type="button" class="thought-card-expand-btn" data-thought-id="${this.escapeHtml(t.id)}" aria-expanded="${isExpanded ? 'true' : 'false'}" title="${isExpanded ? 'Collapse thought' : 'Expand thought'}">${isExpanded ? '▾' : '▸'}</button>
+          </div>
+          <div class="thought-card-details" style="display:${isExpanded ? 'block' : 'none'};">
+            <div class="thought-card-body" style="white-space: pre-wrap; display:${isExpanded ? 'block' : 'none'};">${this.escapeHtml(t.body || '')}</div>
+            <div class="thought-card-actions">
+              <button type="button" class="btn btn-secondary btn-small thought-pin-btn ${t.pinned ? 'active' : ''}" data-thought-id="${this.escapeHtml(t.id)}">${t.pinned ? '📌 Unpin' : '📌 Pin'}</button>
+              <div class="thought-color-picker thought-card-colors" role="group" aria-label="Card color">
+                ${colorOptions.map(c => `<button type="button" class="thought-color-dot ${color === c ? 'active' : ''}" data-thought-id="${this.escapeHtml(t.id)}" data-color="${c}" title="Color: ${c}" aria-label="Set color ${c}"></button>`).join('')}
+              </div>
+              <select class="thought-card-plan-select" data-thought-id="${this.escapeHtml(t.id)}" aria-label="Link thought to plan">
+                <option value="">No linked plan</option>
+                ${topPlans.map(p => `<option value="${this.escapeHtml(p.id)}">${this.escapeHtml(p.title)}</option>`).join('')}
+              </select>
+              <button type="button" class="btn btn-secondary btn-small thought-edit-btn" data-thought-id="${this.escapeHtml(t.id)}">✎ Edit</button>
+              <button type="button" class="btn btn-danger btn-small thought-delete-btn" data-thought-id="${this.escapeHtml(t.id)}">Delete</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Ensure each card's plan select value matches saved planId
+    ordered.forEach(t => {
+      const card = listEl.querySelector(`.thought-card[data-thought-id="${t.id}"]`);
+      const sel = card ? card.querySelector('.thought-card-plan-select') : null;
+      if (sel) {
+        sel.value = (t.planId && planMap.has(t.planId)) ? t.planId : '';
+      }
+    });
+
+    this.bindThoughtListEvents(listEl, thoughts);
+  },
+
+  bindThoughtListEvents(listEl, allThoughts) {
+    let draggedCard = null;
+    const cards = listEl.querySelectorAll('.thought-card');
+
+    const saveOrderFromDom = async () => {
+      const visibleOrderedIds = Array.from(listEl.querySelectorAll('.thought-card'))
+        .map(el => el.dataset.thoughtId)
+        .filter(Boolean);
+      const finalOrderedIds = this.computeReorderedThoughtIds(visibleOrderedIds, allThoughts);
+      await API.reorderThoughts(finalOrderedIds);
+      await this.renderThoughts();
+    };
+
+    cards.forEach(card => {
+      const thoughtId = card.dataset.thoughtId;
+
+      // Toggle expand on header / expand button click
+      const toggleExpand = () => {
+        if (this.expandedThoughtIds.has(thoughtId)) {
+          this.expandedThoughtIds.delete(thoughtId);
+        } else {
+          this.expandedThoughtIds.add(thoughtId);
+        }
+        this.renderThoughts();
+      };
+
+      const header = card.querySelector('.thought-card-header');
+      if (header) {
+        header.addEventListener('click', (e) => {
+          if (e.target.closest('.thought-drag-handle')) return;
+          toggleExpand();
+        });
+      }
+
+      const summary = card.querySelector('.thought-card-summary');
+      if (summary) {
+        summary.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleExpand();
+          }
+        });
+      }
+
+      // Allow text selection in body while keeping drag handle draggable on desktop
+      card.addEventListener('mousedown', (e) => {
+        if (e.detail > 1) e.preventDefault();
+        if (e.target.closest('.thought-card-details')) {
+          card.draggable = false;
+        } else {
+          card.draggable = true;
         }
       });
+      card.addEventListener('mouseup', () => {
+        card.draggable = true;
+      });
+
+      // Desktop HTML5 drag-and-drop
+      card.addEventListener('dragstart', (e) => {
+        draggedCard = card;
+        card.classList.add('thought-dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', thoughtId);
+        }
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('thought-dragging');
+        listEl.querySelectorAll('.thought-card').forEach(el => {
+          el.classList.remove('thought-drag-over-top', 'thought-drag-over-bottom');
+        });
+        draggedCard = null;
+      });
+
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!draggedCard || draggedCard === card) return;
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+
+        const rect = card.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+          card.classList.add('thought-drag-over-top');
+          card.classList.remove('thought-drag-over-bottom');
+        } else {
+          card.classList.add('thought-drag-over-bottom');
+          card.classList.remove('thought-drag-over-top');
+        }
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('thought-drag-over-top', 'thought-drag-over-bottom');
+      });
+
+      card.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!draggedCard || draggedCard === card) return;
+
+        const rect = card.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const insertBefore = e.clientY < midY;
+
+        card.classList.remove('thought-drag-over-top', 'thought-drag-over-bottom');
+        if (insertBefore) {
+          listEl.insertBefore(draggedCard, card);
+        } else {
+          listEl.insertBefore(draggedCard, card.nextSibling);
+        }
+
+        await saveOrderFromDom();
+      });
+
+      // Mobile touch hold-and-drag via .thought-drag-handle
+      let touchStartY = 0;
+      let isTouchDragging = false;
+      const handle = card.querySelector('.thought-drag-handle');
+
+      const onTouchStart = (e) => {
+        if (e.target.closest('button, select, input, textarea, .thought-card-details')) return;
+        if (handle && !e.target.closest('.thought-drag-handle') && e.target !== card) return;
+        touchStartY = e.touches[0].clientY;
+        draggedCard = card;
+      };
+
+      const onTouchMove = (e) => {
+        if (!draggedCard || draggedCard !== card) return;
+        const currentY = e.touches[0].clientY;
+        if (Math.abs(currentY - touchStartY) > 10) {
+          isTouchDragging = true;
+          card.classList.add('thought-dragging');
+        }
+        if (isTouchDragging) {
+          if (e.cancelable) e.preventDefault();
+          const targetEl = document.elementFromPoint(e.touches[0].clientX, currentY);
+          const targetCard = targetEl && targetEl.closest('.thought-card');
+          if (targetCard && targetCard !== card) {
+            const rect = targetCard.getBoundingClientRect();
+            if (currentY < rect.top + rect.height / 2) {
+              listEl.insertBefore(card, targetCard);
+            } else {
+              listEl.insertBefore(card, targetCard.nextSibling);
+            }
+          }
+        }
+      };
+
+      const onTouchEnd = async () => {
+        if (isTouchDragging) {
+          card.classList.remove('thought-dragging');
+          isTouchDragging = false;
+          draggedCard = null;
+          await saveOrderFromDom();
+        } else {
+          draggedCard = null;
+        }
+      };
+
+      card.addEventListener('touchstart', onTouchStart, { passive: true });
+      card.addEventListener('touchmove', onTouchMove, { passive: false });
+      card.addEventListener('touchend', onTouchEnd);
+
+      // Quick actions
+      const pinBtn = card.querySelector('.thought-pin-btn');
+      if (pinBtn) {
+        pinBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const t = allThoughts.find(item => item.id === thoughtId);
+          if (!t) return;
+          await API.updateThought(thoughtId, { pinned: !t.pinned });
+          await this.renderThoughts();
+        });
+      }
+
+      card.querySelectorAll('.thought-color-dot').forEach(dot => {
+        dot.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await API.updateThought(thoughtId, { color: dot.dataset.color || 'default' });
+          await this.renderThoughts();
+        });
+      });
+
+      const planSelect = card.querySelector('.thought-card-plan-select');
+      if (planSelect) {
+        planSelect.addEventListener('change', async (e) => {
+          e.stopPropagation();
+          await API.updateThought(thoughtId, { planId: planSelect.value || null });
+          await this.renderThoughts();
+        });
+      }
+
+      const editBtn = card.querySelector('.thought-edit-btn');
+      if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.openThoughtModal(thoughtId);
+        });
+      }
+
+      const deleteBtn = card.querySelector('.thought-delete-btn');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm('Delete this thought?')) {
+            this.expandedThoughtIds.delete(thoughtId);
+            if (this.spotlightThoughtId === thoughtId) this.spotlightThoughtId = null;
+            await API.deleteThought(thoughtId);
+            await this.renderThoughts();
+          }
+        });
+      }
     });
+  },
+
+  openThoughtModal(thoughtId) {
+    const modal = document.getElementById('thought-modal');
+    if (!modal || !thoughtId) return;
+    const thoughts = (this.state && this.state.thoughts) || [];
+    const thought = thoughts.find(t => t.id === thoughtId);
+    if (!thought) return;
+
+    modal.dataset.thoughtId = thoughtId;
+
+    const titleInput = document.getElementById('thought-edit-title');
+    const bodyInput = document.getElementById('thought-edit-body');
+    const tagInput = document.getElementById('thought-edit-tag');
+    const planSelect = document.getElementById('thought-edit-plan');
+
+    if (titleInput) titleInput.value = thought.title || '';
+    if (bodyInput) bodyInput.value = thought.body || '';
+    if (tagInput) tagInput.value = thought.tag || '';
+    if (planSelect) {
+      this.populatePlanSelect(planSelect, 'No linked plan', '', thought.planId || '');
+    }
+
+    const activeColor = ['default', 'amber', 'sage', 'rose', 'slate'].includes(thought.color)
+      ? thought.color
+      : 'default';
+    modal.querySelectorAll('.thought-color-dot').forEach(dot => {
+      dot.classList.toggle('active', dot.dataset.color === activeColor);
+    });
+
+    modal.style.display = 'flex';
+    if (bodyInput && typeof bodyInput.focus === 'function') {
+      bodyInput.focus();
+    }
   },
 
   escapeHtml(text) {
@@ -1542,3 +2465,5 @@ const Views = {
       .replace(/'/g, '&#039;');
   }
 };
+
+Views.renderGoals = Views.renderPlans;

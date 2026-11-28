@@ -156,10 +156,8 @@
           <span class="nav-icon">✓</span>
           <span>Tasks</span>
         </button>
-        <button class="nav-item" data-view="goals">
-          <span class="nav-icon">🎯</span>
-          <span>Goals</span>
-        </button>
+        <button class="nav-item" data-view="plans"><span class="nav-icon">🎯</span><span>Plans</span></button>
+        <button class="nav-item" data-view="thoughts"><span class="nav-icon">💭</span><span>Thoughts</span></button>
         <button class="nav-item" data-view="diary">
           <span class="nav-icon">📖</span>
           <span>Diary</span>
@@ -310,100 +308,115 @@
         </div>
       </div>
 
-      <!-- Goals View (Life Horizons & Goals) -->
-      <div id="view-goals" class="view">
-        <div class="view-header">
+      <!-- Plans View (Master-Detail Workspace) -->
+      <div id="view-plans" class="view">
+        <div class="view-header plans-view-header">
           <div class="view-title-block">
-            <h1>Goals &amp; Horizons</h1>
-            <span class="goals-subtitle">Organizing aspirations by cadence — from everyday momentum to lifelong visions</span>
+            <h1>Plans</h1>
+            <span class="plans-subtitle">Horizons, strategy &amp; linked daily execution</span>
           </div>
-          <div class="goals-view-actions">
-            <div class="goals-filter-group" id="goals-filter-group">
-              <button type="button" class="goal-filter-btn active" data-filter="all">All Horizons</button>
-              <button type="button" class="goal-filter-btn" data-filter="quick">⚡ Quick (1–7d)</button>
-              <button type="button" class="goal-filter-btn" data-filter="mid">🚀 Mid-Term (1–6m)</button>
-              <button type="button" class="goal-filter-btn" data-filter="long">🌟 Long-Term (1–5y)</button>
+          <div class="goals-view-actions plans-view-actions">
+            <div class="plans-filter-group" id="plans-filter-group">
+              <button type="button" class="plan-filter-btn active" data-filter="all">All</button>
+              <button type="button" class="plan-filter-btn" data-filter="active">Active</button>
+              <button type="button" class="plan-filter-btn" data-filter="quick">⚡ Quick</button>
+              <button type="button" class="plan-filter-btn" data-filter="mid">🚀 Mid</button>
+              <button type="button" class="plan-filter-btn" data-filter="long">🌟 Long</button>
+              <button type="button" class="plan-filter-btn" data-filter="completed">Completed</button>
             </div>
-            <button type="button" id="add-goal-btn" class="btn btn-primary btn-small">+ Add Goal</button>
-          </div>
-        </div>
-
-        <!-- Goals Metric Summary Strip -->
-        <div class="goals-summary-strip">
-          <div class="goal-summary-card">
-            <div class="goal-summary-info">
-              <span class="goal-summary-label">Quick Goals</span>
-              <div class="goal-summary-value"><span id="summary-quick-count">0</span> <small>active</small></div>
-              <span class="goal-summary-hint">1–7 Day Momentum</span>
-            </div>
-            <div class="goal-summary-icon icon-quick">⚡</div>
-          </div>
-          <div class="goal-summary-card">
-            <div class="goal-summary-info">
-              <span class="goal-summary-label">Mid-Term Goals</span>
-              <div class="goal-summary-value"><span id="summary-mid-count">0</span> <small>active</small></div>
-              <span class="goal-summary-hint">1–6 Month Milestones</span>
-            </div>
-            <div class="goal-summary-icon icon-mid">🚀</div>
-          </div>
-          <div class="goal-summary-card">
-            <div class="goal-summary-info">
-              <span class="goal-summary-label">Long-Term Goals</span>
-              <div class="goal-summary-value"><span id="summary-long-count">0</span> <small>active</small></div>
-              <span class="goal-summary-hint">1–5 Year Visions</span>
-            </div>
-            <div class="goal-summary-icon icon-long">🌟</div>
+            <button type="button" id="add-plan-btn" class="btn btn-primary btn-small">+ New Plan</button>
           </div>
         </div>
 
-        <!-- 3-Column Horizon Grid -->
-        <div class="goals-horizon-grid">
-          <!-- Column 1: Quick Goals -->
-          <div class="goal-column" id="goal-col-quick">
-            <div class="goal-column-header">
-              <div class="goal-column-title-wrap">
-                <span class="goal-col-indicator indicator-quick"></span>
-                <h2>Quick Goals</h2>
-                <span class="goal-col-cadence">(1–7 Days)</span>
+        <div class="plans-workspace" id="plans-workspace">
+          <div class="plans-list-pane">
+            <div id="plans-list" class="plans-list">
+              <div class="empty-state">
+                <p>No plans yet. Create one to start planning!</p>
               </div>
-              <span class="goal-count-badge badge-quick" id="quick-badge">0 Active</span>
             </div>
-            <div class="goal-cards-list" id="quick-goals-list">
-              <!-- Cards rendered dynamically -->
-            </div>
-            <button type="button" class="btn-propose-goal" data-category="quick">+ Add Quick Goal</button>
           </div>
-
-          <!-- Column 2: Mid-Term Goals -->
-          <div class="goal-column" id="goal-col-mid">
-            <div class="goal-column-header">
-              <div class="goal-column-title-wrap">
-                <span class="goal-col-indicator indicator-mid"></span>
-                <h2>Mid-Term Goals</h2>
-                <span class="goal-col-cadence">(1–6 Months)</span>
+          <div class="plans-detail-pane">
+            <button type="button" id="plans-mobile-back-btn" class="btn btn-secondary btn-small plans-mobile-back-btn">← All Plans</button>
+            <div id="plans-detail" class="plans-detail">
+              <div class="empty-state">
+                <p>Select a plan to inspect strategy, quick goals, and linked habits &amp; tasks.</p>
               </div>
-              <span class="goal-count-badge badge-mid" id="mid-badge">0 Active</span>
             </div>
-            <div class="goal-cards-list" id="mid-goals-list">
-              <!-- Cards rendered dynamically -->
-            </div>
-            <button type="button" class="btn-propose-goal" data-category="mid">+ Add Mid-Term Goal</button>
           </div>
+        </div>
+      </div>
 
-          <!-- Column 3: Long-Term Goals -->
-          <div class="goal-column" id="goal-col-long">
-            <div class="goal-column-header">
-              <div class="goal-column-title-wrap">
-                <span class="goal-col-indicator indicator-long"></span>
-                <h2>Long-Term Goals</h2>
-                <span class="goal-col-cadence">(1–5 Years)</span>
+      <!-- Thoughts View (Conclusions & Insights) -->
+      <div id="view-thoughts" class="view">
+        <div class="view-header thoughts-view-header">
+          <div class="view-title-block">
+            <h1>Thoughts</h1>
+            <span class="thoughts-subtitle">Conclusions &amp; insights worth re-reading</span>
+          </div>
+          <div class="thoughts-header-actions">
+            <button type="button" id="thoughts-expand-all-btn" class="btn btn-secondary btn-small">Expand All</button>
+            <button type="button" id="thoughts-collapse-all-btn" class="btn btn-secondary btn-small">Collapse All</button>
+          </div>
+        </div>
+
+        <div id="thought-spotlight" class="thoughts-spotlight-card"></div>
+
+        <div class="thought-composer" id="thought-composer">
+          <textarea id="thought-body-input" rows="3" placeholder="Write a thought, conclusion, or insight..."></textarea>
+          <div class="thought-composer-bar">
+            <button type="button" id="thought-pre-save-btn" class="btn btn-primary btn-small">Save Thought</button>
+            <button type="button" id="thought-composer-options-btn" class="btn btn-secondary btn-small" aria-expanded="false">Options</button>
+          </div>
+          <div id="thought-post-write-panel" class="thought-post-write-panel" style="display:none;">
+            <div class="thought-post-write-grid">
+              <div class="input-group">
+                <label for="thought-title-input">Short Title (Optional)</label>
+                <input type="text" id="thought-title-input" placeholder="Short title (optional)">
               </div>
-              <span class="goal-count-badge badge-long" id="long-badge">0 Active</span>
+              <div class="input-group">
+                <label for="thought-tag-input">Tag</label>
+                <input type="text" id="thought-tag-input" placeholder="Tag (e.g. Study, Mindset)">
+              </div>
+              <div class="input-group">
+                <label for="thought-plan-select">Linked Plan</label>
+                <select id="thought-plan-select">
+                  <option value="">No linked plan</option>
+                </select>
+              </div>
             </div>
-            <div class="goal-cards-list" id="long-goals-list">
-              <!-- Cards rendered dynamically -->
+            <div class="thought-post-write-meta-row">
+              <div class="thought-color-picker" role="group" aria-label="Color accent">
+                <span class="thought-color-label">Color:</span>
+                <button type="button" class="thought-color-dot active" data-color="default" title="Default" aria-label="Default color"></button>
+                <button type="button" class="thought-color-dot" data-color="amber" title="Amber" aria-label="Amber color"></button>
+                <button type="button" class="thought-color-dot" data-color="sage" title="Sage" aria-label="Sage color"></button>
+                <button type="button" class="thought-color-dot" data-color="rose" title="Rose" aria-label="Rose color"></button>
+                <button type="button" class="thought-color-dot" data-color="slate" title="Slate" aria-label="Slate color"></button>
+              </div>
+              <div class="thought-post-write-actions">
+                <button type="button" id="thought-cancel-save-btn" class="btn btn-secondary btn-small">Cancel</button>
+                <button type="button" id="thought-skip-title-btn" class="btn btn-secondary btn-small">Save Untitled</button>
+                <button type="button" id="thought-confirm-save-btn" class="btn btn-primary btn-small">Confirm Save</button>
+              </div>
             </div>
-            <button type="button" class="btn-propose-goal" data-category="long">+ Add Long-Term Goal</button>
+          </div>
+        </div>
+
+        <div id="thoughts-filter-bar" class="thoughts-toolbar">
+          <div id="thoughts-filter-group" class="thoughts-filter-group">
+            <button type="button" class="thought-filter-btn active" data-filter="all">All</button>
+            <button type="button" class="thought-filter-btn" data-filter="pinned">Pinned</button>
+          </div>
+          <select id="thoughts-plan-filter" aria-label="Filter thoughts by plan">
+            <option value="all">All Plans</option>
+          </select>
+          <input id="thoughts-search-input" type="text" placeholder="Search thoughts...">
+        </div>
+
+        <div id="thoughts-list" class="thoughts-list">
+          <div class="empty-state">
+            <p>No thoughts yet. Capture an insight or conclusion above!</p>
           </div>
         </div>
       </div>
@@ -627,7 +640,7 @@
               Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
             </p>
             <div class="update-info-row">
-              <span class="app-version-badge">Version 3.7</span>
+              <span class="app-version-badge">Version 3.8</span>
               <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
             </div>
             <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>
@@ -709,16 +722,17 @@
     </div>
   </div>
 
-  <!-- Goal Modal -->
+  <!-- Plan / Goal Modal -->
   <div id="goal-modal" class="modal" style="display:none;">
     <div class="modal-content goal-modal-content">
       <div class="modal-header">
-        <h2 id="goal-modal-title">Add Goal</h2>
+        <h2 id="goal-modal-title">Add Plan</h2>
         <button class="modal-close" id="goal-modal-close">&times;</button>
       </div>
       <div class="modal-body">
+        <input type="hidden" id="goal-parent-id" value="">
         <div class="input-group">
-          <label for="goal-title">Goal Title</label>
+          <label for="goal-title">Plan / Goal Title</label>
           <input type="text" id="goal-title" placeholder="e.g. Morning Sunlight Routine, Run 10K, Build Eco Cottage..." required>
         </div>
         <div class="input-group">
@@ -726,15 +740,15 @@
           <div class="goal-horizon-radios">
             <label class="goal-radio-item">
               <input type="radio" name="goal-category-radio" value="quick" checked>
-              <span>⚡ Quick Goal (1–7 Days)</span>
+              <span>⚡ Quick (1–7 Days)</span>
             </label>
             <label class="goal-radio-item">
               <input type="radio" name="goal-category-radio" value="mid">
-              <span>🚀 Mid-Term Goal (1–6 Months)</span>
+              <span>🚀 Mid-Term (1–6 Months)</span>
             </label>
             <label class="goal-radio-item">
               <input type="radio" name="goal-category-radio" value="long">
-              <span>🌟 Long-Term Goal (1–5 Years)</span>
+              <span>🌟 Long-Term (1–5 Years)</span>
             </label>
           </div>
         </div>
@@ -753,14 +767,64 @@
           <textarea id="goal-description" rows="2" placeholder="Why does this matter? What does success feel like?"></textarea>
         </div>
         <div class="input-group">
+          <label for="goal-strategy">Strategy &amp; Rules (Optional)</label>
+          <textarea id="goal-strategy" rows="2" placeholder="Core rules, triggers, or approach to stay consistent..."></textarea>
+        </div>
+        <div class="input-group">
           <label for="goal-milestones">Milestones / Steps (one per line)</label>
           <textarea id="goal-milestones" rows="3" placeholder="Drink 500ml water upon waking&#10;10-min sunlight walk&#10;No screen first 30 mins"></textarea>
-          <small class="field-hint">Each line creates an interactive checklist milestone on the goal card.</small>
+          <small class="field-hint">Each line creates an interactive checklist milestone on this plan.</small>
         </div>
       </div>
       <div class="modal-footer">
         <button id="delete-goal-btn" class="btn btn-danger" style="display:none;">Delete</button>
-        <button id="save-goal-btn" class="btn btn-primary">Save Goal</button>
+        <button id="save-goal-btn" class="btn btn-primary">Save Plan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thought Edit Modal -->
+  <div id="thought-modal" class="modal" style="display:none;">
+    <div class="modal-content thought-modal-content">
+      <div class="modal-header">
+        <h2 id="thought-modal-title">Edit Thought</h2>
+        <button type="button" class="modal-close" id="thought-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="thought-edit-title">Short Title (Optional)</label>
+          <input type="text" id="thought-edit-title" placeholder="Short title (optional)">
+        </div>
+        <div class="input-group">
+          <label for="thought-edit-body">Thought / Insight</label>
+          <textarea id="thought-edit-body" rows="5" placeholder="Write your thought, conclusion, or insight..." required></textarea>
+        </div>
+        <div class="input-row-flex">
+          <div class="input-group flex-1">
+            <label for="thought-edit-tag">Tag</label>
+            <input type="text" id="thought-edit-tag" placeholder="Tag (e.g. Study, Mindset)">
+          </div>
+          <div class="input-group flex-1">
+            <label for="thought-edit-plan">Linked Plan</label>
+            <select id="thought-edit-plan">
+              <option value="">No linked plan</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Color Accent</label>
+          <div class="thought-color-picker" role="group" aria-label="Edit thought accent color">
+            <button type="button" class="thought-color-dot active" data-color="default" title="Default" aria-label="Default color"></button>
+            <button type="button" class="thought-color-dot" data-color="amber" title="Amber" aria-label="Amber color"></button>
+            <button type="button" class="thought-color-dot" data-color="sage" title="Sage" aria-label="Sage color"></button>
+            <button type="button" class="thought-color-dot" data-color="rose" title="Rose" aria-label="Rose color"></button>
+            <button type="button" class="thought-color-dot" data-color="slate" title="Slate" aria-label="Slate color"></button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="delete-thought-edit-btn" class="btn btn-danger">Delete</button>
+        <button type="button" id="save-thought-edit-btn" class="btn btn-primary">Save Thought</button>
       </div>
     </div>
   </div>

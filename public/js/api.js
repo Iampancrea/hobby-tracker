@@ -84,7 +84,7 @@ const API = {
     return Storage.deleteTask(id);
   },
 
-  // Goals
+  // Goals & Plans
   async createGoal(goal) {
     return Storage.createGoal(goal);
   },
@@ -99,6 +99,43 @@ const API = {
 
   async deleteGoal(id) {
     return Storage.deleteGoal(id);
+  },
+
+  async linkHabitToPlan(planId, habitId) {
+    return Storage.linkHabitToPlan(planId, habitId);
+  },
+
+  async unlinkHabitFromPlan(planId, habitId) {
+    return Storage.unlinkHabitFromPlan(planId, habitId);
+  },
+
+  async linkTaskToPlan(planId, taskId) {
+    return Storage.linkTaskToPlan(planId, taskId);
+  },
+
+  async unlinkTaskFromPlan(planId, taskId) {
+    return Storage.unlinkTaskFromPlan(planId, taskId);
+  },
+
+  // Thoughts
+  async createThought(thought) {
+    return Storage.createThought(thought);
+  },
+
+  async updateThought(id, updates) {
+    return Storage.updateThought(id, updates);
+  },
+
+  async deleteThought(id) {
+    return Storage.deleteThought(id);
+  },
+
+  async reorderThoughts(orderedIds) {
+    return Storage.reorderThoughts(orderedIds);
+  },
+
+  async markThoughtRead(id) {
+    return Storage.markThoughtRead(id);
   },
 
   // Diary

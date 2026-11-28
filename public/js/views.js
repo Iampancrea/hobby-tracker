@@ -1338,7 +1338,7 @@ const Views = {
         });
       });
     } else {
-      quotesList.innerHTML = '<p style="color:#787774;">No quotes yet.</p>';
+      quotesList.innerHTML = '<p style="color: var(--text-muted);">No quotes yet.</p>';
     }
   },
 

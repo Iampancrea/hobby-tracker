@@ -13,6 +13,10 @@ const App = {
     }
     this.initialized = true;
 
+    if (typeof ThemeManager !== 'undefined') {
+      ThemeManager.bindControls();
+    }
+
     // Register Service Worker for 100% Offline Support & Automatic Updates
     if ('serviceWorker' in navigator) {
       let isRefreshing = false;
@@ -570,7 +574,7 @@ const App = {
             }
           }
           if (msg) {
-            msg.textContent = '✓ You are already on the latest version (v3.4)!';
+            msg.textContent = '✓ You are already on the latest version (v3.7)!';
             setTimeout(() => {
               if (msg) msg.style.display = 'none';
             }, 3500);
@@ -982,7 +986,7 @@ const App = {
     syncMsg.style.display = 'block';
     syncMsg.innerHTML = `
       <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 14px; margin-top: 10px;">
-        <div style="font-weight: 600; color: #b45309; margin-bottom: 6px; font-size: 14px;">🔐 Master Password Required for Encrypted Cloud Sync</div>
+        <div style="font-weight: 600; color: var(--amber-glow, #b45309); margin-bottom: 6px; font-size: 14px;">🔐 Master Password Required for Encrypted Cloud Sync</div>
         <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
           You unlocked Hobby Tracker with your Quick PIN. Because all sync data is encrypted with your Master Password before sending to GitHub, please enter your Master Password once below to authorize sync (this also permanently links your PIN):
         </div>

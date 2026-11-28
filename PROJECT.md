@@ -41,6 +41,7 @@
 | 29 | Double-Click Popup Elimination | Prevent browser text selection / context callout menu on rapid double clicking of checkboxes and habit cells | M8 | UX Polish |
 | 30 | Life Horizons & Goals View | 3 distinct horizon columns (Quick Goals 1-7d, Mid-Term 1-6m, Long-Term 1-5y) with interactive milestones, dynamic progress calculation, category filter tabs, summary metrics, and encrypted sync | M9 | Feature |
 | 31 | Compact Diary Calendar & Full-Page Ruled Journal | Streamline top calendar bar into a sleek, low-profile ribbon with compact mini calendar; widen diary book and expand ruled lines across the whole page with authentic red margin line and footer mood selector | M9 | UX Polish |
+| 32 | Warm Candlelit Dark Mode & Toggle | Aesthetic warm espresso/walnut dark mode with amber glow toggles across sidebar, topbars, login screen, and Settings swatch selector; includes full candlelit ruled leather-bound diary styling and zero-flash persistence | M10 | Feature |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -55,6 +56,7 @@
 | M7 | UX, Timeline & Calendar Polish | Infinite habit timeline, non-overlapping collapsed topbar, local-time date consistency, endless diary year navigation | M1-M5 | DONE |
 | M8 | Polish, Draggable Tasks & Streak Engine | Love/Discipline Note renaming, sidebar cleanup, seamless update check, flame streak system, full habit color styling, draggable tasks, rapid click popup removal | M1-M7 | DONE |
 | M9 | Life Horizons Goals & Authentic Journal Polish | Quick/Mid/Long Goals view with milestones, compact top calendar ribbon, full-page ruled diary with margin line | M1-M8 | DONE |
+| M10 | Warm Candlelit Dark Mode | Tactile warm dark mode toggle across shell, login, and Settings; full candlelit espresso/walnut/sage theme | M1-M9 | DONE |
 
 ## Interface Contracts
 ### App Shell ↔ Views

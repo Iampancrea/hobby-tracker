@@ -18,6 +18,20 @@
   <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
   <link rel="stylesheet" href="./css/style.css">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('hobby_theme');
+        var theme = saved === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', '#151311');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital@1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -27,6 +41,14 @@
   <div id="login-screen" class="screen">
     <div class="login-container">
       <div class="login-card">
+        <button type="button" id="login-theme-btn" class="theme-icon-toggle login-theme-toggle" data-theme-toggle role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle warm dark mode">
+          <span class="theme-glyph-sun" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          </span>
+          <span class="theme-glyph-moon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </span>
+        </button>
         <div class="app-brand-icon">
           <img src="./icons/icon.svg" alt="Hobby Tracker Logo" width="56" height="56">
         </div>
@@ -90,9 +112,19 @@
     <header class="mobile-topbar">
       <button id="mobile-menu-btn" class="btn btn-icon" title="Toggle Menu">☰</button>
       <span class="mobile-brand">Hobby Tracker</span>
-      <div id="mobile-sync-badge" class="sync-badge" title="Sync status">
-        <span class="sync-dot"></span>
-        <span class="sync-text">Synced</span>
+      <div class="mobile-topbar-actions">
+        <button type="button" id="mobile-theme-btn" class="theme-icon-toggle" data-theme-toggle role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle warm dark mode">
+          <span class="theme-glyph-sun" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          </span>
+          <span class="theme-glyph-moon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </span>
+        </button>
+        <div id="mobile-sync-badge" class="sync-badge" title="Sync status">
+          <span class="sync-dot"></span>
+          <span class="sync-text">Synced</span>
+        </div>
       </div>
     </header>
 
@@ -139,6 +171,24 @@
       </nav>
 
       <div class="sidebar-footer">
+        <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" data-theme-toggle role="switch" aria-checked="false" aria-label="Toggle warm dark mode" title="Switch between Warm Paper and Candlelit Dark">
+          <span class="theme-toggle-label-group">
+            <span class="theme-toggle-status-icon" aria-hidden="true">
+              <svg class="theme-glyph-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              <svg class="theme-glyph-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </span>
+            <span class="theme-toggle-text">Warm Light</span>
+          </span>
+          <span class="theme-switch-track" aria-hidden="true">
+            <span class="theme-switch-track-icon track-sun">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41m12.73-12.73-1.41 1.41"/></svg>
+            </span>
+            <span class="theme-switch-track-icon track-moon">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </span>
+            <span class="theme-switch-thumb"></span>
+          </span>
+        </button>
         <button id="lock-btn" class="btn btn-secondary btn-small" title="Lock Vault">🔒 Lock Vault</button>
       </div>
     </aside>
@@ -150,6 +200,14 @@
       <div id="collapsed-topbar" class="collapsed-topbar">
         <button type="button" id="sidebar-expand-btn" class="btn btn-icon" title="Show sidebar" aria-label="Show sidebar">☰</button>
         <span class="collapsed-topbar-title">Hobby Tracker</span>
+        <button type="button" id="collapsed-theme-btn" class="theme-icon-toggle collapsed-theme-toggle" data-theme-toggle role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle warm dark mode">
+          <span class="theme-glyph-sun" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          </span>
+          <span class="theme-glyph-moon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </span>
+        </button>
       </div>
 
       <!-- Top Quote Banner (Permanent across all views) -->
@@ -427,6 +485,46 @@
           <h1>Settings</h1>
         </div>
         <div class="settings-content">
+          <!-- Appearance & Theme Section -->
+          <div class="settings-section appearance-section">
+            <h3>Appearance &amp; Ambience</h3>
+            <p class="settings-description">
+              Switch between sun-lit Warm Paper and cozy Candlelit Dark workspace tones.
+            </p>
+            <div class="theme-swatch-grid" role="radiogroup" aria-label="Theme selection">
+              <button type="button" class="theme-swatch-card active" data-theme-choice="light" aria-pressed="true">
+                <div class="theme-swatch-preview preview-light" aria-hidden="true">
+                  <span class="swatch-bar"></span>
+                  <div class="swatch-dots">
+                    <span class="swatch-dot" style="background:#3fa34d;"></span>
+                    <span class="swatch-dot" style="background:#e5dfd5;"></span>
+                    <span class="swatch-dot" style="background:#2d2d2d;"></span>
+                  </div>
+                </div>
+                <div class="theme-swatch-meta">
+                  <span class="theme-swatch-name">Warm Paper</span>
+                  <span class="theme-swatch-desc">Daylight notebook</span>
+                </div>
+                <span class="theme-swatch-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" class="theme-swatch-card" data-theme-choice="dark" aria-pressed="false">
+                <div class="theme-swatch-preview preview-dark" aria-hidden="true">
+                  <span class="swatch-bar"></span>
+                  <div class="swatch-dots">
+                    <span class="swatch-dot" style="background:#4eb85d;"></span>
+                    <span class="swatch-dot" style="background:#e5a952;"></span>
+                    <span class="swatch-dot" style="background:#efe9e0;"></span>
+                  </div>
+                </div>
+                <div class="theme-swatch-meta">
+                  <span class="theme-swatch-name">Candlelit Dark</span>
+                  <span class="theme-swatch-desc">Warm espresso &amp; amber</span>
+                </div>
+                <span class="theme-swatch-check" aria-hidden="true">✓</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Encrypted Cloud Sync Section -->
           <div class="settings-section">
             <h3>Encrypted Cloud Sync (GitHub Gist)</h3>
@@ -529,7 +627,7 @@
               Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
             </p>
             <div class="update-info-row">
-              <span class="app-version-badge">Version 3.6</span>
+              <span class="app-version-badge">Version 3.7</span>
               <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
             </div>
             <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>

@@ -1,9 +1,113 @@
+// Theme & Ambience Controller (Warm Paper Light / Candlelit Dark)
+const ThemeManager = {
+  STORAGE_KEY: 'hobby_theme',
+  _transitionTimer: null,
+
+  getTheme() {
+    try {
+      return localStorage.getItem(this.STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+    } catch (_) {
+      return 'light';
+    }
+  },
+
+  apply(theme, animate = false) {
+    const resolved = theme === 'dark' ? 'dark' : 'light';
+    const root = document.documentElement;
+
+    if (animate && root) {
+      root.classList.add('theme-transition');
+      clearTimeout(this._transitionTimer);
+      this._transitionTimer = setTimeout(() => {
+        root.classList.remove('theme-transition');
+      }, 320);
+    }
+
+    if (root) {
+      root.setAttribute('data-theme', resolved);
+      if (root.classList && typeof root.classList.toggle === 'function') {
+        root.classList.toggle('dark', resolved === 'dark');
+      }
+    }
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', resolved === 'dark' ? '#151311' : '#3fa34d');
+    }
+
+    this.syncUI(resolved);
+    return resolved;
+  },
+
+  setTheme(theme, animate = true) {
+    const resolved = this.apply(theme, animate);
+    try {
+      localStorage.setItem(this.STORAGE_KEY, resolved);
+    } catch (_) {}
+    return resolved;
+  },
+
+  toggle() {
+    const next = this.getTheme() === 'dark' ? 'light' : 'dark';
+    return this.setTheme(next, true);
+  },
+
+  syncUI(theme = this.getTheme()) {
+    const isDark = theme === 'dark';
+
+    document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+      btn.setAttribute('aria-checked', String(isDark));
+      btn.setAttribute('data-theme-state', theme);
+      btn.classList.toggle('is-dark', isDark);
+      btn.title = isDark ? 'Switch to Warm Paper Light' : 'Switch to Candlelit Dark';
+
+      const textEl = btn.querySelector('.theme-toggle-text');
+      if (textEl) {
+        textEl.textContent = isDark ? 'Candlelit Dark' : 'Warm Paper';
+      }
+    });
+
+    document.querySelectorAll('[data-theme-choice]').forEach(card => {
+      const active = card.dataset.themeChoice === theme;
+      card.classList.toggle('active', active);
+      card.setAttribute('aria-pressed', String(active));
+    });
+  },
+
+  bindControls() {
+    document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+      if (btn.dataset.themeBound === '1') return;
+      btn.dataset.themeBound = '1';
+      btn.addEventListener('click', () => {
+        this.toggle();
+      });
+    });
+
+    document.querySelectorAll('[data-theme-choice]').forEach(card => {
+      if (card.dataset.themeBound === '1') return;
+      card.dataset.themeBound = '1';
+      card.addEventListener('click', () => {
+        const target = card.dataset.themeChoice;
+        if (target) this.setTheme(target, true);
+      });
+    });
+
+    this.syncUI();
+  },
+
+  init() {
+    this.apply(this.getTheme(), false);
+    this.bindControls();
+  }
+};
+
 // Auth & Quick PIN Lock Controller
 const Auth = {
   currentPin: '',
   hasPin: false,
 
   async init() {
+    ThemeManager.init();
     await Storage.init();
     Sync.init();
 
@@ -124,6 +228,11 @@ const Auth = {
     const pinPad = document.getElementById('pin-pad-container');
     if (pinPad) pinPad.style.display = 'none';
     document.getElementById('login-form').style.display = 'block';
+    const confirmGroup = document.getElementById('confirm-password-group');
+    const subtitle = document.getElementById('login-subtitle');
+    if (subtitle && (!confirmGroup || confirmGroup.style.display === 'none')) {
+      subtitle.textContent = 'Unlock your vault';
+    }
     this.clearError();
   },
 

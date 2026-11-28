@@ -1,5 +1,5 @@
 // Hobby Tracker Service Worker - Offline-First Engine
-const CACHE_NAME = 'hobby-tracker-v3.8';
+const CACHE_NAME = 'hobby-tracker-v3.9';
 
 const APP_SHELL = [
   './',

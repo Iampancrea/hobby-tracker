@@ -27,7 +27,7 @@
   --radius: 6px;
   --radius-sm: 4px;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Lora', Georgia, serif;
+  --font-serif: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
 
@@ -304,10 +304,12 @@ input, textarea {
 
 .top-quote-banner blockquote {
   font-family: var(--font-serif);
-  font-style: italic;
+  font-style: normal;
+  font-weight: 500;
   font-size: 15px;
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
   margin: 0 0 4px 0;
   word-break: break-word;
 }
@@ -2112,7 +2114,7 @@ input, textarea {
   display: block;
   font-size: 26px;
   font-weight: 700;
-  font-family: 'Lora', Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', serif;
   color: #2a2421;
   letter-spacing: -0.2px;
 }
@@ -2146,7 +2148,7 @@ input, textarea {
   padding: 6px 20px 6px 88px;
   font-size: 16px;
   line-height: 32px;
-  font-family: 'Lora', Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', serif;
   color: #2b2623;
   background: repeating-linear-gradient(
     transparent,
@@ -4041,9 +4043,11 @@ input, textarea {
 .thoughts-spotlight-card .spotlight-body,
 .thoughts-spotlight-card .thought-spotlight-body {
   font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 15.5px;
   line-height: 1.65;
+  letter-spacing: -0.01em;
   color: var(--text);
   white-space: pre-wrap;
   word-break: break-word;

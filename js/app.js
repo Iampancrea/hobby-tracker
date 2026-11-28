@@ -574,7 +574,7 @@ const App = {
             }
           }
           if (msg) {
-            msg.textContent = '✓ You are already on the latest version (v3.8)!';
+            msg.textContent = '✓ You are already on the latest version (v3.9)!';
             setTimeout(() => {
               if (msg) msg.style.display = 'none';
             }, 3500);

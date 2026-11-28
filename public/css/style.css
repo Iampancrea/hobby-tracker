@@ -270,31 +270,99 @@ input, textarea {
 
 /* === PERMANENT APP SHELL TOP QUOTE BANNER === */
 .top-quote-banner {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius);
-  padding: 14px 20px;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 96% 12%, rgba(217, 119, 6, 0.08), transparent 45%),
+              linear-gradient(135deg, #ffffff 0%, #f9f6ee 100%);
+  border: 1px solid #dfd8ca;
+  border-left: 5px solid var(--primary);
+  border-radius: 10px;
+  padding: 16px 22px 18px;
   margin-bottom: 24px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 16px rgba(45, 40, 32, 0.06);
   transition: all 0.2s ease;
+}
+
+.top-quote-banner.is-custom {
+  border-left-color: #d97706;
+  background: radial-gradient(circle at 96% 12%, rgba(217, 119, 6, 0.12), transparent 48%),
+              linear-gradient(135deg, #fffdf9 0%, #f8f2e4 100%);
+}
+
+.top-quote-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-left: 34px;
+}
+
+.top-quote-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+}
+
+.top-quote-kicker::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.top-quote-banner.is-custom .top-quote-kicker {
+  color: #b45309;
+}
+
+.quote-next-btn {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.quote-next-btn:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: #c8bfb0;
+}
+
+.quote-next-btn:active {
+  transform: scale(0.96);
 }
 
 .top-quote-content {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 12px;
 }
 
 .quote-mark {
-  font-family: var(--font-serif);
-  font-size: 34px;
-  line-height: 0.9;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 46px;
+  line-height: 0.75;
   color: var(--primary);
-  opacity: 0.85;
+  opacity: 0.88;
   user-select: none;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 4px;
+}
+
+.top-quote-banner.is-custom .quote-mark {
+  color: #d97706;
 }
 
 .top-quote-body {
@@ -305,22 +373,23 @@ input, textarea {
 .top-quote-banner blockquote {
   font-family: var(--font-serif);
   font-style: normal;
-  font-weight: 500;
-  font-size: 15px;
-  color: var(--text);
-  line-height: 1.55;
-  letter-spacing: -0.01em;
-  margin: 0 0 4px 0;
+  font-weight: 700;
+  font-size: 18.5px;
+  color: #1d1c19;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px 0;
   word-break: break-word;
 }
 
 .top-quote-banner cite {
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-muted);
   font-style: normal;
   display: block;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 /* Backward-compatibility alias for legacy tests */
@@ -331,22 +400,26 @@ input, textarea {
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .top-quote-banner {
-    padding: 10px 14px;
+    padding: 13px 15px 14px;
     margin-bottom: 16px;
-    gap: 10px;
+  }
+
+  .top-quote-meta-row {
+    padding-left: 26px;
+    margin-bottom: 6px;
   }
 
   .quote-mark {
-    font-size: 26px;
+    font-size: 32px;
   }
 
   .top-quote-banner blockquote {
-    font-size: 13.5px;
-    line-height: 1.45;
+    font-size: 16px;
+    line-height: 1.4;
   }
 
   .top-quote-banner cite {
-    font-size: 11px;
+    font-size: 11.5px;
   }
 }
 
@@ -850,6 +923,62 @@ input, textarea {
 .quote-item-author {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.quote-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quote-custom-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: rgba(217, 119, 6, 0.14);
+  color: #b45309;
+}
+
+html[data-theme="dark"] .quote-custom-pill {
+  background: rgba(229, 169, 82, 0.16);
+  color: #f3c16c;
+}
+
+.quote-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.quote-item-show {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.quote-item-show:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.quote-item.is-active {
+  border-color: var(--primary);
+}
+
+.quote-item.is-active .quote-item-show {
+  background: rgba(63, 163, 77, 0.14);
+  border-color: rgba(63, 163, 77, 0.4);
+  color: var(--primary);
 }
 
 .quote-item-delete {
@@ -5218,14 +5347,55 @@ html[data-theme="dark"] .collapsed-topbar .btn:hover {
 
 /* Permanent Top Quote Banner with subtle candlelight warmth */
 html[data-theme="dark"] .top-quote-banner {
-  background: linear-gradient(125deg, #211d19 0%, #1d1a16 65%, #262018 100%);
-  border-color: var(--border);
-  border-left: 4px solid var(--primary);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 245, 230, 0.04);
+  background: radial-gradient(circle at 8% 20%, rgba(78, 184, 93, 0.14), transparent 42%),
+              radial-gradient(circle at 92% 15%, rgba(229, 169, 82, 0.15), transparent 48%),
+              linear-gradient(135deg, #221d18 0%, #181411 100%);
+  border-color: rgba(229, 169, 82, 0.22);
+  border-left: 5px solid var(--primary);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 245, 230, 0.06);
+}
+
+html[data-theme="dark"] .top-quote-banner.is-custom {
+  background: radial-gradient(circle at 8% 20%, rgba(229, 169, 82, 0.18), transparent 44%),
+              radial-gradient(circle at 92% 15%, rgba(229, 169, 82, 0.16), transparent 48%),
+              linear-gradient(135deg, #241e16 0%, #191511 100%);
+  border-color: rgba(229, 169, 82, 0.34);
+  border-left-color: #e5a952;
+}
+
+html[data-theme="dark"] .top-quote-banner blockquote {
+  color: #f6efe4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .top-quote-banner cite {
+  color: #c2b5a3;
+}
+
+html[data-theme="dark"] .top-quote-banner.is-custom .top-quote-kicker {
+  color: #f3c16c;
 }
 
 html[data-theme="dark"] .quote-mark {
   color: var(--primary);
+  text-shadow: 0 0 16px rgba(78, 184, 93, 0.25);
+}
+
+html[data-theme="dark"] .top-quote-banner.is-custom .quote-mark {
+  color: #e5a952;
+  text-shadow: 0 0 16px rgba(229, 169, 82, 0.3);
+}
+
+html[data-theme="dark"] .quote-next-btn {
+  background: rgba(255, 245, 230, 0.05);
+  border-color: rgba(229, 169, 82, 0.22);
+  color: #b8ac9b;
+}
+
+html[data-theme="dark"] .quote-next-btn:hover {
+  background: rgba(229, 169, 82, 0.14);
+  border-color: rgba(229, 169, 82, 0.45);
+  color: #f5ede0;
 }
 
 html[data-theme="dark"] .update-banner {

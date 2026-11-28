@@ -32,7 +32,7 @@ const Views = {
     this.renderTopQuote();
   },
 
-  renderTopQuote(forceRefresh = false) {
+  renderTopQuote(forceRefresh = false, preferredQuoteId = null) {
     const banner = document.getElementById('top-quote-banner');
     if (!banner) return;
 
@@ -43,24 +43,52 @@ const Views = {
       return;
     }
 
-    // Retain current quote on routine view switching unless forced or deleted
-    if (!forceRefresh && this._activeQuote && quotes.some(q => q.id === this._activeQuote.id)) {
+    // Retain current quote on routine view switching unless forced, preferred, or deleted
+    if (!forceRefresh && !preferredQuoteId && this._activeQuote && quotes.some(q => q.id === this._activeQuote.id)) {
       banner.style.display = 'block';
       return;
     }
 
-    // Deterministic daily index with quote count modulo
-    const todayStr = DateUtils.todayKey();
-    let hash = 0;
-    for (let i = 0; i < todayStr.length; i++) {
-      hash = ((hash << 5) - hash) + todayStr.charCodeAt(i);
+    let selectedQuote = null;
+    if (preferredQuoteId) {
+      selectedQuote = quotes.find(q => q.id === preferredQuoteId) || null;
     }
-    const quoteIndex = Math.abs(hash) % quotes.length;
-    const selectedQuote = quotes[quoteIndex] || quotes[0];
+
+    if (!selectedQuote) {
+      let lastQuoteId = null;
+      try { lastQuoteId = localStorage.getItem('hobby_last_quote_id'); } catch (_) {}
+
+      const currentId = (this._activeQuote && this._activeQuote.id) || lastQuoteId;
+      const customQuotes = quotes.filter(q => q.custom);
+
+      if (quotes.length === 1) {
+        selectedQuote = quotes[0];
+      } else if (forceRefresh && this._activeQuote) {
+        // Explicit Next/cycle: advance cleanly round-robin through the whole list
+        const curIdx = quotes.findIndex(q => q.id === this._activeQuote.id);
+        const nextIdx = curIdx >= 0 ? (curIdx + 1) % quotes.length : 0;
+        selectedQuote = quotes[nextIdx];
+      } else {
+        // Fresh load / unlock: never repeat the previous quote; prioritize custom quotes 70% of the time when present
+        const nonRepeating = quotes.filter(q => q.id !== currentId);
+        const customPool = customQuotes.filter(q => q.id !== currentId);
+        const pool = (customPool.length && Math.random() < 0.7) ? customPool : nonRepeating;
+        const pickFrom = pool.length ? pool : quotes;
+        selectedQuote = pickFrom[Math.floor(Math.random() * pickFrom.length)] || quotes[0];
+      }
+    }
+
     this._activeQuote = selectedQuote;
+    try {
+      if (selectedQuote && selectedQuote.id) {
+        localStorage.setItem('hobby_last_quote_id', selectedQuote.id);
+      }
+    } catch (_) {}
 
     const quoteTextEl = document.getElementById('quote-text') || banner.querySelector('blockquote');
     const quoteAuthorEl = document.getElementById('quote-author') || banner.querySelector('cite');
+    const quoteKickerEl = document.getElementById('quote-kicker');
+    const quoteNextBtn = document.getElementById('quote-next-btn');
 
     if (quoteTextEl) {
       const cleanText = (selectedQuote.text || '').trim().replace(/^["“]+|["”]+$/g, '');
@@ -72,6 +100,15 @@ const Views = {
       quoteAuthorEl.textContent = `— ${author}`;
     }
 
+    if (quoteKickerEl) {
+      quoteKickerEl.textContent = selectedQuote.custom ? 'YOUR MANTRA' : 'DAILY FOCUS';
+    }
+
+    if (quoteNextBtn) {
+      quoteNextBtn.style.display = quotes.length > 1 ? 'inline-flex' : 'none';
+    }
+
+    banner.classList.toggle('is-custom', !!selectedQuote.custom);
     banner.style.display = 'block';
   },
 
@@ -1323,18 +1360,32 @@ const Views = {
     if (quotes.length > 0) {
       let html = '';
       quotes.forEach(quote => {
+        const isActive = this._activeQuote && this._activeQuote.id === quote.id;
         html += `
-          <div class="quote-item">
+          <div class="quote-item ${isActive ? 'is-active' : ''}">
             <div class="quote-item-content">
               <div class="quote-item-text">${this.escapeHtml(quote.text)}</div>
-              <div class="quote-item-author">— ${this.escapeHtml(quote.author || 'Unknown')}</div>
+              <div class="quote-item-meta">
+                <span class="quote-item-author">— ${this.escapeHtml(quote.author || 'Unknown')}</span>
+                ${quote.custom ? '<span class="quote-custom-pill">Yours</span>' : ''}
+              </div>
             </div>
-            ${quote.custom ? `<button class="quote-item-delete" data-id="${quote.id}">×</button>` : ''}
+            <div class="quote-item-actions">
+              <button type="button" class="quote-item-show" data-id="${quote.id}" title="Show in banner">${isActive ? 'Showing' : 'Show'}</button>
+              ${quote.custom ? `<button type="button" class="quote-item-delete" data-id="${quote.id}" title="Delete quote">×</button>` : ''}
+            </div>
           </div>
         `;
       });
       quotesList.innerHTML = html;
-      
+
+      quotesList.querySelectorAll('.quote-item-show').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.renderTopQuote(true, btn.dataset.id);
+          this.renderSettings();
+        });
+      });
+
       quotesList.querySelectorAll('.quote-item-delete').forEach(btn => {
         btn.addEventListener('click', async () => {
           if (confirm('Delete this quote?')) {

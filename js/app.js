@@ -493,6 +493,17 @@ const App = {
       }
     });
 
+    // Top quote banner Next button
+    const quoteNextBtn = document.getElementById('quote-next-btn');
+    if (quoteNextBtn) {
+      quoteNextBtn.addEventListener('click', () => {
+        Views.renderTopQuote(true);
+        if (this.currentViewName === 'settings') {
+          Views.renderSettings();
+        }
+      });
+    }
+
     // Settings: Quotes
     document.getElementById('add-quote-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -502,12 +513,12 @@ const App = {
       if (!text) return;
 
       try {
-        await API.createQuote({ text, author });
+        const created = await API.createQuote({ text, author });
         document.getElementById('new-quote-text').value = '';
         document.getElementById('new-quote-author').value = '';
         await Views.loadState();
         Views.renderSettings();
-        Views.renderTopQuote(true);
+        Views.renderTopQuote(true, created && created.id);
       } catch (e) {
         alert('Error: ' + e.message);
       }
@@ -574,7 +585,7 @@ const App = {
             }
           }
           if (msg) {
-            msg.textContent = '✓ You are already on the latest version (v3.9)!';
+            msg.textContent = '✓ You are already on the latest version (v3.10)!';
             setTimeout(() => {
               if (msg) msg.style.display = 'none';
             }, 3500);

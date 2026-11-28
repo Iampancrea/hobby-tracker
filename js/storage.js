@@ -48,6 +48,7 @@ const Storage = {
     notes: [],
     tasks: [],
     goals: [],
+    thoughts: [],
     diary: {},
     quotes: [
       { id: 'q_seed_1', text: 'Discipline is choosing what you want most over what you want now.', author: 'Unknown', custom: false, updatedAt: new Date().toISOString() },
@@ -59,7 +60,8 @@ const Storage = {
       tasks: {},
       notes: {},
       quotes: {},
-      goals: {}
+      goals: {},
+      thoughts: {}
     },
     lastModifiedAt: new Date().toISOString()
   },
@@ -338,7 +340,8 @@ const Storage = {
       tasks: (state.tasks || []).filter(t => !t._deleted),
       goals: (state.goals || []).filter(g => !g._deleted),
       notes: (state.notes || []).filter(n => !n._deleted),
-      quotes: (state.quotes || []).filter(q => !q._deleted)
+      quotes: (state.quotes || []).filter(q => !q._deleted),
+      thoughts: (state.thoughts || []).filter(th => !th._deleted)
     };
     return cleaned;
   },
@@ -410,6 +413,9 @@ const Storage = {
         }
       }
     }
+
+    // Strip deleted habit from every plan's linkedHabitIds
+    this._stripLinkedIdFromGoals(state, 'linkedHabitIds', id, now);
 
     await this.saveRawState(state);
     return { success: true };
@@ -594,10 +600,15 @@ const Storage = {
 
   async deleteTask(id) {
     const state = await this.getState();
+    const now = new Date().toISOString();
     state.tasks = (state.tasks || []).filter(t => t.id !== id);
     if (!state.tombstones) state.tombstones = {};
     if (!state.tombstones.tasks) state.tombstones.tasks = {};
-    state.tombstones.tasks[id] = new Date().toISOString();
+    state.tombstones.tasks[id] = now;
+
+    // Strip deleted task from every plan's linkedTaskIds
+    this._stripLinkedIdFromGoals(state, 'linkedTaskIds', id, now);
+
     await this.saveRawState(state);
     return { success: true };
   },
@@ -648,21 +659,77 @@ const Storage = {
     return { success: true };
   },
 
-  // Goals
-  async createGoal(goalData) {
+  // Goals & Plans
+  _normalizeIdArray(value) {
+    if (!Array.isArray(value)) return [];
+    return Array.from(new Set(value.filter(Boolean).map(String)));
+  },
+
+  _stripLinkedIdFromGoals(state, field, entityId, now) {
+    if (!Array.isArray(state.goals)) return;
+    for (const goal of state.goals) {
+      if (Array.isArray(goal[field]) && goal[field].includes(entityId)) {
+        goal[field] = goal[field].filter(itemId => itemId !== entityId);
+        goal.updatedAt = now;
+      }
+    }
+  },
+
+  async _linkEntityToPlan(planId, entityId, field, entityLabel) {
+    if (!planId) throw new Error('Plan ID is required');
+    if (!entityId) throw new Error(`${entityLabel} ID is required`);
+    const state = await this.getState();
+    const plan = (state.goals || []).find(g => g.id === planId);
+    if (!plan) throw new Error('Plan not found');
+    if (!Array.isArray(plan[field])) plan[field] = [];
+    const strId = String(entityId);
+    if (!plan[field].includes(strId)) {
+      plan[field].push(strId);
+      plan.updatedAt = new Date().toISOString();
+      await this.saveRawState(state);
+    }
+    return plan;
+  },
+
+  async _unlinkEntityFromPlan(planId, entityId, field) {
+    if (!planId) throw new Error('Plan ID is required');
+    const state = await this.getState();
+    const plan = (state.goals || []).find(g => g.id === planId);
+    if (!plan) throw new Error('Plan not found');
+    const prev = Array.isArray(plan[field]) ? plan[field] : [];
+    const strId = String(entityId);
+    const next = prev.filter(itemId => itemId !== strId);
+    if (next.length !== prev.length || !Array.isArray(plan[field])) {
+      plan[field] = next;
+      plan.updatedAt = new Date().toISOString();
+      await this.saveRawState(state);
+    }
+    return plan;
+  },
+
+  async createGoal(goalData = {}) {
     const state = await this.getState();
     if (!state.goals) state.goals = [];
     const now = new Date().toISOString();
+    const data = goalData || {};
+    const parsedOrder = (data.order !== undefined && data.order !== null && data.order !== '' && Number.isFinite(Number(data.order)))
+      ? Number(data.order)
+      : state.goals.length;
     const goal = {
       id: 'g_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-      title: goalData.title || '',
-      category: goalData.category || 'quick', // 'quick' | 'mid' | 'long'
-      tag: goalData.tag || 'General',
-      targetDate: goalData.targetDate || '',
-      progress: Number(goalData.progress) || 0,
-      status: goalData.status || 'active', // 'active' | 'completed' | 'archived'
-      description: goalData.description || '',
-      milestones: Array.isArray(goalData.milestones) ? goalData.milestones : [],
+      title: data.title || '',
+      category: data.category || 'quick', // 'quick' | 'mid' | 'long'
+      tag: data.tag || 'General',
+      targetDate: data.targetDate || '',
+      progress: Number(data.progress) || 0,
+      status: data.status || 'active', // 'active' | 'completed' | 'archived'
+      description: data.description || '',
+      milestones: Array.isArray(data.milestones) ? data.milestones : [],
+      parentId: data.parentId ? String(data.parentId) : null,
+      strategy: data.strategy != null ? String(data.strategy) : '',
+      linkedHabitIds: this._normalizeIdArray(data.linkedHabitIds),
+      linkedTaskIds: this._normalizeIdArray(data.linkedTaskIds),
+      order: parsedOrder,
       createdAt: now,
       updatedAt: now
     };
@@ -671,11 +738,44 @@ const Storage = {
     return goal;
   },
 
-  async updateGoal(id, updates) {
+  async updateGoal(id, updates = {}) {
     const state = await this.getState();
-    const goal = (state.goals || []).find(g => g.id === id);
-    if (!goal) throw new Error('Goal not found');
-    Object.assign(goal, updates, { updatedAt: new Date().toISOString() });
+    const idx = (state.goals || []).findIndex(g => g.id === id);
+    if (idx === -1) throw new Error('Goal not found');
+    const goal = state.goals[idx];
+    const cleanUpdates = { ...(updates || {}) };
+
+    if ('parentId' in cleanUpdates) {
+      cleanUpdates.parentId = (cleanUpdates.parentId && String(cleanUpdates.parentId) !== id)
+        ? String(cleanUpdates.parentId)
+        : null;
+    }
+    if ('strategy' in cleanUpdates) {
+      cleanUpdates.strategy = cleanUpdates.strategy != null ? String(cleanUpdates.strategy) : '';
+    }
+    if ('linkedHabitIds' in cleanUpdates) {
+      cleanUpdates.linkedHabitIds = this._normalizeIdArray(cleanUpdates.linkedHabitIds);
+    }
+    if ('linkedTaskIds' in cleanUpdates) {
+      cleanUpdates.linkedTaskIds = this._normalizeIdArray(cleanUpdates.linkedTaskIds);
+    }
+    if ('order' in cleanUpdates) {
+      const num = Number(cleanUpdates.order);
+      if (cleanUpdates.order !== '' && cleanUpdates.order !== null && Number.isFinite(num)) {
+        cleanUpdates.order = num;
+      } else {
+        delete cleanUpdates.order;
+      }
+    }
+
+    // Preserve schema defaults on legacy goals when updated
+    if (!('parentId' in goal)) goal.parentId = null;
+    if (!('strategy' in goal)) goal.strategy = '';
+    if (!Array.isArray(goal.linkedHabitIds)) goal.linkedHabitIds = [];
+    if (!Array.isArray(goal.linkedTaskIds)) goal.linkedTaskIds = [];
+    if (typeof goal.order !== 'number' || !Number.isFinite(goal.order)) goal.order = idx;
+
+    Object.assign(goal, cleanUpdates, { id, updatedAt: new Date().toISOString() });
     await this.saveRawState(state);
     return goal;
   },
@@ -702,12 +802,163 @@ const Storage = {
 
   async deleteGoal(id) {
     const state = await this.getState();
+    const now = new Date().toISOString();
     state.goals = (state.goals || []).filter(g => g.id !== id);
     if (!state.tombstones) state.tombstones = {};
     if (!state.tombstones.goals) state.tombstones.goals = {};
-    state.tombstones.goals[id] = new Date().toISOString();
+    state.tombstones.goals[id] = now;
+
+    // Detach nested quick goals so none are orphaned
+    for (const g of state.goals) {
+      if (g.parentId === id) {
+        g.parentId = null;
+        g.updatedAt = now;
+      }
+    }
+
+    // Detach linked thoughts so none are orphaned
+    if (Array.isArray(state.thoughts)) {
+      for (const th of state.thoughts) {
+        if (th.planId === id) {
+          th.planId = null;
+          th.updatedAt = now;
+        }
+      }
+    }
+
     await this.saveRawState(state);
     return { success: true };
+  },
+
+  async linkHabitToPlan(planId, habitId) {
+    return this._linkEntityToPlan(planId, habitId, 'linkedHabitIds', 'Habit');
+  },
+
+  async unlinkHabitFromPlan(planId, habitId) {
+    return this._unlinkEntityFromPlan(planId, habitId, 'linkedHabitIds');
+  },
+
+  async linkTaskToPlan(planId, taskId) {
+    return this._linkEntityToPlan(planId, taskId, 'linkedTaskIds', 'Task');
+  },
+
+  async unlinkTaskFromPlan(planId, taskId) {
+    return this._unlinkEntityFromPlan(planId, taskId, 'linkedTaskIds');
+  },
+
+  // Thoughts
+  _sanitizeThoughtColor(color) {
+    const allowed = ['default', 'amber', 'sage', 'rose', 'slate'];
+    if (typeof color !== 'string') return 'default';
+    const normalized = color.trim().toLowerCase();
+    return allowed.includes(normalized) ? normalized : 'default';
+  },
+
+  async createThought(thoughtData = {}) {
+    const data = thoughtData || {};
+    const body = typeof data.body === 'string' ? data.body.trim() : '';
+    if (!body) {
+      throw new Error('Thought body cannot be empty');
+    }
+
+    const state = await this.getState();
+    if (!state.thoughts) state.thoughts = [];
+    const now = new Date().toISOString();
+    const thought = {
+      id: 'th_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      title: data.title != null ? String(data.title).trim() : '',
+      body,
+      tag: data.tag != null ? String(data.tag).trim() : '',
+      color: this._sanitizeThoughtColor(data.color),
+      pinned: !!data.pinned,
+      expanded: !!data.expanded,
+      planId: data.planId ? String(data.planId) : null,
+      readCount: 0,
+      lastReadAt: null,
+      createdAt: now,
+      updatedAt: now
+    };
+    state.thoughts.unshift(thought);
+    await this.saveRawState(state);
+    return thought;
+  },
+
+  async updateThought(id, updates = {}) {
+    const state = await this.getState();
+    const thought = (state.thoughts || []).find(t => t.id === id);
+    if (!thought) throw new Error('Thought not found');
+
+    const cleanUpdates = { ...(updates || {}) };
+    if ('body' in cleanUpdates) {
+      const body = typeof cleanUpdates.body === 'string' ? cleanUpdates.body.trim() : '';
+      if (!body) throw new Error('Thought body cannot be empty');
+      cleanUpdates.body = body;
+    }
+    if ('title' in cleanUpdates) {
+      cleanUpdates.title = cleanUpdates.title != null ? String(cleanUpdates.title).trim() : '';
+    }
+    if ('tag' in cleanUpdates) {
+      cleanUpdates.tag = cleanUpdates.tag != null ? String(cleanUpdates.tag).trim() : '';
+    }
+    if ('color' in cleanUpdates) {
+      cleanUpdates.color = this._sanitizeThoughtColor(cleanUpdates.color);
+    }
+    if ('pinned' in cleanUpdates) {
+      cleanUpdates.pinned = !!cleanUpdates.pinned;
+    }
+    if ('expanded' in cleanUpdates) {
+      cleanUpdates.expanded = !!cleanUpdates.expanded;
+    }
+    if ('planId' in cleanUpdates) {
+      cleanUpdates.planId = cleanUpdates.planId ? String(cleanUpdates.planId) : null;
+    }
+
+    Object.assign(thought, cleanUpdates, { id, updatedAt: new Date().toISOString() });
+    await this.saveRawState(state);
+    return thought;
+  },
+
+  async deleteThought(id) {
+    const state = await this.getState();
+    state.thoughts = (state.thoughts || []).filter(t => t.id !== id);
+    if (!state.tombstones) state.tombstones = {};
+    if (!state.tombstones.thoughts) state.tombstones.thoughts = {};
+    state.tombstones.thoughts[id] = new Date().toISOString();
+    await this.saveRawState(state);
+    return { success: true };
+  },
+
+  async reorderThoughts(orderedIds) {
+    const state = await this.getState();
+    if (!state.thoughts || !Array.isArray(state.thoughts)) return [];
+    const ids = Array.isArray(orderedIds) ? orderedIds : [];
+    const thoughtMap = new Map(state.thoughts.map(t => [t.id, t]));
+    const reordered = [];
+    for (const id of ids) {
+      const thought = thoughtMap.get(id);
+      if (thought) {
+        reordered.push(thought);
+        thoughtMap.delete(id);
+      }
+    }
+    for (const remaining of thoughtMap.values()) {
+      reordered.push(remaining);
+    }
+    state.thoughts = reordered;
+    await this.saveRawState(state);
+    return state.thoughts;
+  },
+
+  async markThoughtRead(id) {
+    const state = await this.getState();
+    const thought = (state.thoughts || []).find(t => t.id === id);
+    if (!thought) throw new Error('Thought not found');
+    const now = new Date().toISOString();
+    thought.lastReadAt = now;
+    thought.readCount = (Number(thought.readCount) || 0) + 1;
+    thought.updatedAt = now;
+    await this.saveRawState(state);
+    return thought;
   },
 
   // Settings & Sync configuration
@@ -739,9 +990,15 @@ const Storage = {
     if (!importedObj || typeof importedObj !== 'object') {
       throw new Error('Invalid backup file');
     }
+    const baseDefaults = JSON.parse(JSON.stringify(this.defaultState));
     const state = {
-      ...this.defaultState,
+      ...baseDefaults,
       ...importedObj,
+      thoughts: Array.isArray(importedObj.thoughts) ? importedObj.thoughts : [],
+      tombstones: {
+        ...baseDefaults.tombstones,
+        ...(importedObj.tombstones || {})
+      },
       lastModifiedAt: new Date().toISOString()
     };
     await this.saveRawState(state);

@@ -122,7 +122,8 @@ const Sync = {
       tasks: { ...(local.tombstones?.tasks || {}), ...(remote.tombstones?.tasks || {}) },
       notes: { ...(local.tombstones?.notes || {}), ...(remote.tombstones?.notes || {}) },
       quotes: { ...(local.tombstones?.quotes || {}), ...(remote.tombstones?.quotes || {}) },
-      goals: { ...(local.tombstones?.goals || {}), ...(remote.tombstones?.goals || {}) }
+      goals: { ...(local.tombstones?.goals || {}), ...(remote.tombstones?.goals || {}) },
+      thoughts: { ...(local.tombstones?.thoughts || {}), ...(remote.tombstones?.thoughts || {}) }
     };
     merged.tombstones = tombstones;
 
@@ -266,10 +267,13 @@ const Sync = {
     });
     merged.quotes = Array.from(quoteMap.values()).filter(q => !tombstones.quotes[q.id]);
 
-    // 8. Merge goals
+    // 8. Merge goals (Plans & Quick Goals)
     const goalMap = new Map();
-    (local.goals || []).forEach(g => goalMap.set(g.id, g));
+    (local.goals || []).forEach(g => {
+      if (g && g.id) goalMap.set(g.id, g);
+    });
     (remote.goals || []).forEach(remoteGoal => {
+      if (!remoteGoal || !remoteGoal.id) return;
       const deletedAt = tombstones.goals[remoteGoal.id];
       const remoteUpdated = new Date(remoteGoal.updatedAt || remoteGoal.createdAt || 0).getTime();
       if (deletedAt && new Date(deletedAt).getTime() >= remoteUpdated) {
@@ -286,7 +290,59 @@ const Sync = {
         }
       }
     });
-    merged.goals = Array.from(goalMap.values()).filter(g => !tombstones.goals[g.id]);
+    merged.goals = Array.from(goalMap.values())
+      .filter(g => !tombstones.goals[g.id])
+      .map((g, idx) => ({
+        ...g,
+        parentId: (g.parentId && !tombstones.goals[g.parentId] && g.parentId !== g.id) ? String(g.parentId) : null,
+        strategy: typeof g.strategy === 'string' ? g.strategy : (g.strategy != null ? String(g.strategy) : ''),
+        linkedHabitIds: Array.isArray(g.linkedHabitIds)
+          ? Array.from(new Set(g.linkedHabitIds.filter(hid => hid && !tombstones.habits[hid]).map(String)))
+          : [],
+        linkedTaskIds: Array.isArray(g.linkedTaskIds)
+          ? Array.from(new Set(g.linkedTaskIds.filter(tid => tid && !tombstones.tasks[tid]).map(String)))
+          : [],
+        order: (typeof g.order === 'number' && Number.isFinite(g.order)) ? g.order : idx
+      }));
+
+    // 9. Merge thoughts
+    const thoughtMap = new Map();
+    (local.thoughts || []).forEach(th => {
+      if (th && th.id) thoughtMap.set(th.id, th);
+    });
+    (remote.thoughts || []).forEach(remoteThought => {
+      if (!remoteThought || !remoteThought.id) return;
+      const deletedAt = tombstones.thoughts[remoteThought.id];
+      const remoteUpdated = new Date(remoteThought.updatedAt || remoteThought.createdAt || 0).getTime();
+      if (deletedAt && new Date(deletedAt).getTime() >= remoteUpdated) {
+        thoughtMap.delete(remoteThought.id);
+        return;
+      }
+      if (!thoughtMap.has(remoteThought.id)) {
+        thoughtMap.set(remoteThought.id, remoteThought);
+      } else {
+        const localThought = thoughtMap.get(remoteThought.id);
+        const localUpdated = new Date(localThought.updatedAt || localThought.createdAt || 0).getTime();
+        if (remoteUpdated > localUpdated) {
+          thoughtMap.set(remoteThought.id, remoteThought);
+        }
+      }
+    });
+    const validThoughtColors = ['default', 'amber', 'sage', 'rose', 'slate'];
+    merged.thoughts = Array.from(thoughtMap.values())
+      .filter(th => !tombstones.thoughts[th.id])
+      .map(th => ({
+        ...th,
+        title: th.title != null ? String(th.title) : '',
+        body: th.body != null ? String(th.body) : '',
+        tag: th.tag != null ? String(th.tag) : '',
+        color: validThoughtColors.includes(th.color) ? th.color : 'default',
+        pinned: !!th.pinned,
+        expanded: !!th.expanded,
+        planId: (th.planId && !tombstones.goals[th.planId]) ? String(th.planId) : null,
+        readCount: Number.isFinite(Number(th.readCount)) ? Number(th.readCount) : 0,
+        lastReadAt: th.lastReadAt || null
+      }));
 
     merged.lastModifiedAt = new Date().toISOString();
     return merged;

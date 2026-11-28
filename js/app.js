@@ -574,7 +574,7 @@ const App = {
             }
           }
           if (msg) {
-            msg.textContent = '✓ You are already on the latest version (v3.7)!';
+            msg.textContent = '✓ You are already on the latest version (v3.8)!';
             setTimeout(() => {
               if (msg) msg.style.display = 'none';
             }, 3500);
@@ -771,28 +771,35 @@ const App = {
       }
     });
 
-    // Goal Modal and Event Handlers
-    const openGoalModal = (goalId = null, defaultCategory = 'quick') => {
+    // Plan / Goal Modal and Event Handlers
+    const openGoalModal = (goalId = null, defaultCategory = 'quick', parentId = null) => {
       const modal = document.getElementById('goal-modal');
       if (!modal) return;
       const titleInput = document.getElementById('goal-title');
       const tagInput = document.getElementById('goal-tag');
       const targetDateInput = document.getElementById('goal-target-date');
       const descInput = document.getElementById('goal-description');
+      const strategyInput = document.getElementById('goal-strategy');
+      const parentIdInput = document.getElementById('goal-parent-id');
       const milestonesInput = document.getElementById('goal-milestones');
       const deleteBtn = document.getElementById('delete-goal-btn');
       const modalTitle = document.getElementById('goal-modal-title');
+      const saveBtn = document.getElementById('save-goal-btn');
 
       modal.dataset.goalId = goalId || '';
 
       if (goalId && Views.state && Views.state.goals) {
         const goal = Views.state.goals.find(g => g.id === goalId);
         if (goal) {
-          if (modalTitle) modalTitle.textContent = 'Edit Goal';
+          const isChildGoal = !!(goal.parentId || parentId);
+          if (modalTitle) modalTitle.textContent = isChildGoal ? 'Edit Quick Goal' : 'Edit Plan';
+          if (saveBtn) saveBtn.textContent = isChildGoal ? 'Save Quick Goal' : 'Save Plan';
           if (titleInput) titleInput.value = goal.title || '';
           if (tagInput) tagInput.value = goal.tag || '';
           if (targetDateInput) targetDateInput.value = goal.targetDate || '';
           if (descInput) descInput.value = goal.description || '';
+          if (strategyInput) strategyInput.value = goal.strategy || '';
+          if (parentIdInput) parentIdInput.value = goal.parentId || parentId || '';
           const ms = (goal.milestones || []).map(m => m.text).join('\n');
           if (milestonesInput) milestonesInput.value = ms;
           const radio = document.querySelector(`input[name="goal-category-radio"][value="${goal.category || 'quick'}"]`);
@@ -804,11 +811,15 @@ const App = {
         }
       }
 
-      if (modalTitle) modalTitle.textContent = 'Add Goal';
+      const isChild = !!parentId;
+      if (modalTitle) modalTitle.textContent = isChild ? 'Add Quick Goal' : 'Add Plan';
+      if (saveBtn) saveBtn.textContent = isChild ? 'Save Quick Goal' : 'Save Plan';
       if (titleInput) titleInput.value = '';
       if (tagInput) tagInput.value = '';
       if (targetDateInput) targetDateInput.value = '';
       if (descInput) descInput.value = '';
+      if (strategyInput) strategyInput.value = '';
+      if (parentIdInput) parentIdInput.value = parentId || '';
       if (milestonesInput) milestonesInput.value = '';
       const radio = document.querySelector(`input[name="goal-category-radio"][value="${defaultCategory}"]`);
       if (radio) radio.checked = true;
@@ -819,16 +830,19 @@ const App = {
 
     window.openGoalModal = openGoalModal;
 
+    const addPlanBtn = document.getElementById('add-plan-btn');
+    if (addPlanBtn) {
+      addPlanBtn.addEventListener('click', () => {
+        const f = Views.currentPlanFilter;
+        const defaultCat = (f === 'quick' || f === 'mid' || f === 'long') ? f : 'quick';
+        openGoalModal(null, defaultCat, null);
+      });
+    }
+
     const addGoalBtn = document.getElementById('add-goal-btn');
     if (addGoalBtn) {
       addGoalBtn.addEventListener('click', () => openGoalModal());
     }
-
-    document.querySelectorAll('.btn-propose-goal').forEach(btn => {
-      btn.addEventListener('click', () => {
-        openGoalModal(null, btn.dataset.category || 'quick');
-      });
-    });
 
     const closeGoalModal = () => {
       const modal = document.getElementById('goal-modal');
@@ -840,15 +854,30 @@ const App = {
       goalModalCloseBtn.addEventListener('click', closeGoalModal);
     }
 
-    // Filter tabs in Goals
-    document.querySelectorAll('.goal-filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        Views.currentGoalFilter = btn.dataset.filter;
-        Views.renderGoals();
+    // Filter tabs in Plans
+    const plansFilterGroup = document.getElementById('plans-filter-group');
+    if (plansFilterGroup) {
+      plansFilterGroup.querySelectorAll('.plan-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          plansFilterGroup.querySelectorAll('.plan-filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          Views.currentPlanFilter = btn.dataset.filter || 'all';
+          if (typeof Views.renderPlans === 'function') Views.renderPlans();
+        });
       });
-    });
+    }
 
-    // Save Goal
+    const plansMobileBackBtn = document.getElementById('plans-mobile-back-btn');
+    if (plansMobileBackBtn) {
+      plansMobileBackBtn.addEventListener('click', () => {
+        Views.mobilePlanDetailOpen = false;
+        const workspace = document.querySelector('.plans-workspace');
+        if (workspace) workspace.classList.remove('is-mobile-detail');
+        if (typeof Views.renderPlans === 'function') Views.renderPlans();
+      });
+    }
+
+    // Save Plan / Goal
     const saveGoalBtn = document.getElementById('save-goal-btn');
     if (saveGoalBtn) {
       saveGoalBtn.addEventListener('click', async () => {
@@ -856,7 +885,7 @@ const App = {
         const goalId = modal.dataset.goalId;
         const title = document.getElementById('goal-title').value.trim();
         if (!title) {
-          alert('Please enter a goal title');
+          alert('Please enter a plan title');
           return;
         }
         const categoryRadio = document.querySelector('input[name="goal-category-radio"]:checked');
@@ -864,6 +893,10 @@ const App = {
         const tag = document.getElementById('goal-tag').value.trim() || 'General';
         const targetDate = document.getElementById('goal-target-date').value.trim();
         const description = document.getElementById('goal-description').value.trim();
+        const strategyEl = document.getElementById('goal-strategy');
+        const strategy = strategyEl ? strategyEl.value.trim() : '';
+        const parentIdEl = document.getElementById('goal-parent-id');
+        const parentId = (parentIdEl && parentIdEl.value.trim()) ? parentIdEl.value.trim() : null;
         const milestoneLines = document.getElementById('goal-milestones').value
           .split('\n')
           .map(l => l.trim())
@@ -896,34 +929,43 @@ const App = {
               tag,
               targetDate,
               description,
+              strategy,
+              parentId,
               milestones,
               progress
             });
           } else {
-            await API.createGoal({
+            const created = await API.createGoal({
               title,
               category,
               tag,
               targetDate,
               description,
+              strategy,
+              parentId,
               milestones,
               progress
             });
+            if (created && created.id && !parentId) {
+              Views.selectedPlanId = created.id;
+              Views.mobilePlanDetailOpen = true;
+            }
           }
           modal.style.display = 'none';
           await Views.loadState();
-          Views.renderGoals();
+          if (typeof Views.renderPlans === 'function') await Views.renderPlans();
+          else if (typeof Views.renderGoals === 'function') Views.renderGoals();
         } catch (e) {
           alert('Error: ' + e.message);
         }
       });
     }
 
-    // Delete Goal
+    // Delete Plan / Goal
     const deleteGoalBtn = document.getElementById('delete-goal-btn');
     if (deleteGoalBtn) {
       deleteGoalBtn.addEventListener('click', async () => {
-        if (!confirm('Delete this goal and all its milestones?')) return;
+        if (!confirm('Delete this plan and all its milestones?')) return;
         const modal = document.getElementById('goal-modal');
         const goalId = modal.dataset.goalId;
         if (!goalId) return;
@@ -931,8 +973,254 @@ const App = {
         try {
           await API.deleteGoal(goalId);
           modal.style.display = 'none';
+          if (Views.selectedPlanId === goalId) {
+            Views.selectedPlanId = null;
+            Views.mobilePlanDetailOpen = false;
+          }
           await Views.loadState();
-          Views.renderGoals();
+          if (typeof Views.renderPlans === 'function') await Views.renderPlans();
+          else if (typeof Views.renderGoals === 'function') Views.renderGoals();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
+
+    // Thoughts View Composer, Toolbar & Modal Bindings
+    const thoughtBodyInput = document.getElementById('thought-body-input');
+    const thoughtTitleInput = document.getElementById('thought-title-input');
+    const thoughtTagInput = document.getElementById('thought-tag-input');
+    const thoughtPlanSelect = document.getElementById('thought-plan-select');
+    const thoughtPreSaveBtn = document.getElementById('thought-pre-save-btn');
+    const thoughtOptionsBtn = document.getElementById('thought-composer-options-btn');
+    const thoughtPostWritePanel = document.getElementById('thought-post-write-panel');
+    const thoughtConfirmSaveBtn = document.getElementById('thought-confirm-save-btn');
+    const thoughtSkipTitleBtn = document.getElementById('thought-skip-title-btn');
+    const thoughtCancelSaveBtn = document.getElementById('thought-cancel-save-btn');
+
+    const setThoughtPanelOpen = (open) => {
+      if (!thoughtPostWritePanel) return;
+      thoughtPostWritePanel.style.display = open ? '' : 'none';
+      if (thoughtOptionsBtn) {
+        thoughtOptionsBtn.setAttribute('aria-expanded', String(!!open));
+      }
+    };
+
+    const getComposerThoughtColor = () => {
+      const activeDot = document.querySelector('#thought-post-write-panel .thought-color-dot.active');
+      return (activeDot && activeDot.dataset.color) || 'default';
+    };
+
+    const setComposerThoughtColor = (color = 'default') => {
+      document.querySelectorAll('#thought-post-write-panel .thought-color-dot').forEach(dot => {
+        dot.classList.toggle('active', dot.dataset.color === color);
+      });
+    };
+
+    document.querySelectorAll('#thought-post-write-panel .thought-color-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        setComposerThoughtColor(dot.dataset.color || 'default');
+      });
+    });
+
+    if (thoughtPreSaveBtn) {
+      thoughtPreSaveBtn.addEventListener('click', () => {
+        setThoughtPanelOpen(true);
+        if (thoughtTitleInput) thoughtTitleInput.focus();
+      });
+    }
+
+    if (thoughtOptionsBtn) {
+      thoughtOptionsBtn.addEventListener('click', () => {
+        if (!thoughtPostWritePanel) return;
+        const isHidden = thoughtPostWritePanel.style.display === 'none';
+        setThoughtPanelOpen(isHidden);
+      });
+    }
+
+    if (thoughtCancelSaveBtn) {
+      thoughtCancelSaveBtn.addEventListener('click', () => {
+        setThoughtPanelOpen(false);
+      });
+    }
+
+    const saveComposerThought = async (untitled = false) => {
+      const body = thoughtBodyInput ? thoughtBodyInput.value.trim() : '';
+      if (!body) {
+        alert('Please write a thought first');
+        if (thoughtBodyInput) thoughtBodyInput.focus();
+        return;
+      }
+
+      const title = untitled ? '' : (thoughtTitleInput ? thoughtTitleInput.value.trim() : '');
+      const tag = thoughtTagInput ? thoughtTagInput.value.trim() : '';
+      const color = getComposerThoughtColor();
+      const planId = (thoughtPlanSelect && thoughtPlanSelect.value) ? thoughtPlanSelect.value : null;
+
+      try {
+        await API.createThought({
+          title,
+          body,
+          tag,
+          color,
+          planId,
+          pinned: false,
+          expanded: false
+        });
+        if (thoughtBodyInput) thoughtBodyInput.value = '';
+        if (thoughtTitleInput) thoughtTitleInput.value = '';
+        if (thoughtTagInput) thoughtTagInput.value = '';
+        if (thoughtPlanSelect) thoughtPlanSelect.value = '';
+        setComposerThoughtColor('default');
+        setThoughtPanelOpen(false);
+        await Views.loadState();
+        if (typeof Views.renderThoughts === 'function') await Views.renderThoughts();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    if (thoughtConfirmSaveBtn) {
+      thoughtConfirmSaveBtn.addEventListener('click', () => saveComposerThought(false));
+    }
+
+    if (thoughtSkipTitleBtn) {
+      thoughtSkipTitleBtn.addEventListener('click', () => saveComposerThought(true));
+    }
+
+    if (thoughtBodyInput) {
+      thoughtBodyInput.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          if (thoughtPostWritePanel && thoughtPostWritePanel.style.display === 'none') {
+            setThoughtPanelOpen(true);
+            if (thoughtTitleInput) thoughtTitleInput.focus();
+          } else {
+            saveComposerThought(false);
+          }
+        }
+      });
+    }
+
+    const thoughtsFilterGroup = document.getElementById('thoughts-filter-group');
+    if (thoughtsFilterGroup) {
+      thoughtsFilterGroup.querySelectorAll('.thought-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          thoughtsFilterGroup.querySelectorAll('.thought-filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          Views.currentThoughtFilter = btn.dataset.filter || 'all';
+          if (typeof Views.renderThoughts === 'function') Views.renderThoughts();
+        });
+      });
+    }
+
+    const thoughtsPlanFilter = document.getElementById('thoughts-plan-filter');
+    if (thoughtsPlanFilter) {
+      thoughtsPlanFilter.addEventListener('change', (e) => {
+        Views.currentThoughtPlanFilter = e.target.value || 'all';
+        if (typeof Views.renderThoughts === 'function') Views.renderThoughts();
+      });
+    }
+
+    const thoughtsSearchInput = document.getElementById('thoughts-search-input');
+    if (thoughtsSearchInput) {
+      thoughtsSearchInput.addEventListener('input', (e) => {
+        Views.currentThoughtSearch = e.target.value || '';
+        if (typeof Views.renderThoughts === 'function') Views.renderThoughts();
+      });
+    }
+
+    const thoughtsExpandAllBtn = document.getElementById('thoughts-expand-all-btn');
+    if (thoughtsExpandAllBtn) {
+      thoughtsExpandAllBtn.addEventListener('click', () => {
+        if (!(Views.expandedThoughtIds instanceof Set)) {
+          Views.expandedThoughtIds = new Set();
+        }
+        const thoughts = (Views.state && Views.state.thoughts) || [];
+        thoughts.forEach(t => {
+          if (t && t.id) Views.expandedThoughtIds.add(t.id);
+        });
+        if (typeof Views.renderThoughts === 'function') Views.renderThoughts();
+      });
+    }
+
+    const thoughtsCollapseAllBtn = document.getElementById('thoughts-collapse-all-btn');
+    if (thoughtsCollapseAllBtn) {
+      thoughtsCollapseAllBtn.addEventListener('click', () => {
+        if (Views.expandedThoughtIds instanceof Set) {
+          Views.expandedThoughtIds.clear();
+        } else {
+          Views.expandedThoughtIds = new Set();
+        }
+        if (typeof Views.renderThoughts === 'function') Views.renderThoughts();
+      });
+    }
+
+    // Thought Edit Modal
+    document.querySelectorAll('#thought-modal .thought-color-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        document.querySelectorAll('#thought-modal .thought-color-dot').forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+      });
+    });
+
+    const saveThoughtEditBtn = document.getElementById('save-thought-edit-btn');
+    if (saveThoughtEditBtn) {
+      saveThoughtEditBtn.addEventListener('click', async () => {
+        const modal = document.getElementById('thought-modal');
+        if (!modal) return;
+        const thoughtId = modal.dataset.thoughtId;
+        if (!thoughtId) return;
+
+        const titleInput = document.getElementById('thought-edit-title');
+        const bodyInput = document.getElementById('thought-edit-body');
+        const tagInput = document.getElementById('thought-edit-tag');
+        const planSelect = document.getElementById('thought-edit-plan');
+        const activeDot = modal.querySelector('.thought-color-dot.active');
+
+        const body = bodyInput ? bodyInput.value.trim() : '';
+        if (!body) {
+          alert('Please write a thought first');
+          if (bodyInput) bodyInput.focus();
+          return;
+        }
+
+        const title = titleInput ? titleInput.value.trim() : '';
+        const tag = tagInput ? tagInput.value.trim() : '';
+        const planId = (planSelect && planSelect.value) ? planSelect.value : null;
+        const color = (activeDot && activeDot.dataset.color) || 'default';
+
+        try {
+          await API.updateThought(thoughtId, { title, body, tag, planId, color });
+          modal.style.display = 'none';
+          await Views.loadState();
+          if (typeof Views.renderThoughts === 'function') await Views.renderThoughts();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
+
+    const deleteThoughtEditBtn = document.getElementById('delete-thought-edit-btn');
+    if (deleteThoughtEditBtn) {
+      deleteThoughtEditBtn.addEventListener('click', async () => {
+        const modal = document.getElementById('thought-modal');
+        if (!modal) return;
+        const thoughtId = modal.dataset.thoughtId;
+        if (!thoughtId) return;
+        if (!confirm('Delete this thought?')) return;
+
+        try {
+          await API.deleteThought(thoughtId);
+          modal.style.display = 'none';
+          if (Views.expandedThoughtIds instanceof Set) {
+            Views.expandedThoughtIds.delete(thoughtId);
+          }
+          if (Views.spotlightThoughtId === thoughtId) {
+            Views.spotlightThoughtId = null;
+          }
+          await Views.loadState();
+          if (typeof Views.renderThoughts === 'function') await Views.renderThoughts();
         } catch (e) {
           alert('Error: ' + e.message);
         }
@@ -1062,6 +1350,7 @@ const App = {
   },
 
   switchView(view, options = {}) {
+    if (view === 'goals') view = 'plans';
     this.currentViewName = view;
     document.querySelectorAll('.nav-item').forEach(item => {
       item.classList.toggle('active', item.dataset.view === view);
@@ -1075,7 +1364,8 @@ const App = {
     const titles = {
       habits: 'Habits — Hobby Tracker',
       tasks: 'Tasks — Hobby Tracker',
-      goals: 'Goals — Hobby Tracker',
+      plans: 'Plans — Hobby Tracker',
+      thoughts: 'Thoughts — Hobby Tracker',
       diary: 'Diary — Hobby Tracker',
       settings: 'Settings — Hobby Tracker'
     };
@@ -1092,7 +1382,13 @@ const App = {
         : { centerToday: true });
     }
     else if (view === 'tasks') Views.renderTasks();
-    else if (view === 'goals') Views.renderGoals();
+    else if (view === 'plans') {
+      if (typeof Views.renderPlans === 'function') Views.renderPlans();
+      else if (typeof Views.renderGoals === 'function') Views.renderGoals();
+    }
+    else if (view === 'thoughts') {
+      if (typeof Views.renderThoughts === 'function') Views.renderThoughts();
+    }
     else if (view === 'diary') Views.renderDiary();
     else if (view === 'settings') Views.renderSettings();
   }

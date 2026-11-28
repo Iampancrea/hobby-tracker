@@ -505,24 +505,146 @@ const App = {
     }
 
     // Settings: Quotes
-    document.getElementById('add-quote-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const text = document.getElementById('new-quote-text').value.trim();
-      const author = document.getElementById('new-quote-author').value.trim();
+    const quoteForm = document.getElementById('add-quote-form');
+    const newQuoteInput = document.getElementById('new-quote-text');
+    const quoteBigCapsBtn = document.getElementById('quote-big-caps-btn');
+    const quotePreviewWrap = document.getElementById('quote-live-preview');
+    const quotePreviewText = document.getElementById('quote-live-preview-text');
 
-      if (!text) return;
+    const updateQuoteComposerUI = () => {
+      if (!newQuoteInput) return;
+      const val = newQuoteInput.value || '';
+      const pos = typeof newQuoteInput.selectionStart === 'number' ? newQuoteInput.selectionStart : val.length;
+      const markersBefore = (val.slice(0, pos).match(/\^\^/g) || []).length;
+      const insideBigCaps = markersBefore % 2 === 1;
 
-      try {
-        const created = await API.createQuote({ text, author });
-        document.getElementById('new-quote-text').value = '';
-        document.getElementById('new-quote-author').value = '';
-        await Views.loadState();
-        Views.renderSettings();
-        Views.renderTopQuote(true, created && created.id);
-      } catch (e) {
-        alert('Error: ' + e.message);
+      if (quoteBigCapsBtn) {
+        quoteBigCapsBtn.classList.toggle('active', insideBigCaps);
       }
-    });
+      if (quotePreviewWrap && quotePreviewText) {
+        if (val.trim() && (val.includes('^^') || val.includes('\n'))) {
+          quotePreviewText.innerHTML = Views.formatQuoteHtml(val);
+          quotePreviewWrap.style.display = 'block';
+        } else {
+          quotePreviewWrap.style.display = 'none';
+          quotePreviewText.innerHTML = '';
+        }
+      }
+    };
+
+    if (newQuoteInput) {
+      newQuoteInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (quoteForm) {
+            if (typeof quoteForm.requestSubmit === 'function') {
+              quoteForm.requestSubmit();
+            } else {
+              quoteForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+          }
+        }
+      });
+      newQuoteInput.addEventListener('input', updateQuoteComposerUI);
+      newQuoteInput.addEventListener('click', updateQuoteComposerUI);
+      newQuoteInput.addEventListener('keyup', updateQuoteComposerUI);
+    }
+
+    if (quoteBigCapsBtn && newQuoteInput) {
+      quoteBigCapsBtn.addEventListener('click', () => {
+        const val = newQuoteInput.value || '';
+        const start = typeof newQuoteInput.selectionStart === 'number' ? newQuoteInput.selectionStart : val.length;
+        const end = typeof newQuoteInput.selectionEnd === 'number' ? newQuoteInput.selectionEnd : val.length;
+
+        if (end > start) {
+          const selected = val.slice(start, end);
+          let nextVal;
+          let nextStart;
+          let nextEnd;
+
+          if (selected.startsWith('^^') && selected.endsWith('^^') && selected.length >= 4) {
+            const inner = selected.slice(2, -2);
+            nextVal = val.slice(0, start) + inner + val.slice(end);
+            nextStart = start;
+            nextEnd = start + inner.length;
+          } else if (val.slice(Math.max(0, start - 2), start) === '^^' && val.slice(end, end + 2) === '^^') {
+            nextVal = val.slice(0, start - 2) + selected + val.slice(end + 2);
+            nextStart = start - 2;
+            nextEnd = nextStart + selected.length;
+          } else {
+            const wrapped = `^^${selected.toUpperCase()}^^`;
+            nextVal = val.slice(0, start) + wrapped + val.slice(end);
+            nextStart = start;
+            nextEnd = start + wrapped.length;
+          }
+
+          newQuoteInput.value = nextVal;
+          newQuoteInput.focus();
+          if (typeof newQuoteInput.setSelectionRange === 'function') {
+            newQuoteInput.setSelectionRange(nextStart, nextEnd);
+          }
+        } else {
+          if (val.slice(Math.max(0, start - 2), start) === '^^' && val.slice(start, start + 2) === '^^') {
+            // Cursor is inside an empty ^^^^ pair — toggle it off cleanly
+            const untoggled = val.slice(0, start - 2) + val.slice(start + 2);
+            const nextPos = start - 2;
+            newQuoteInput.value = untoggled;
+            newQuoteInput.focus();
+            if (typeof newQuoteInput.setSelectionRange === 'function') {
+              newQuoteInput.setSelectionRange(nextPos, nextPos);
+            }
+            updateQuoteComposerUI();
+            return;
+          }
+          const markersBefore = (val.slice(0, start).match(/\^\^/g) || []).length;
+          if (markersBefore % 2 === 1) {
+            // Cursor is inside an open ^^...^^ block — jump out past closing ^^
+            const closeIdx = val.indexOf('^^', start);
+            if (closeIdx !== -1) {
+              const afterClose = closeIdx + 2;
+              newQuoteInput.focus();
+              if (typeof newQuoteInput.setSelectionRange === 'function') {
+                newQuoteInput.setSelectionRange(afterClose, afterClose);
+              }
+              updateQuoteComposerUI();
+              return;
+            }
+          }
+          const needsPad = val.slice(Math.max(0, start - 2), start) === '^^';
+          const insertion = needsPad ? ' ^^^^' : '^^^^';
+          const nextVal = val.slice(0, start) + insertion + val.slice(end);
+          newQuoteInput.value = nextVal;
+          const innerPos = start + (needsPad ? 3 : 2);
+          newQuoteInput.focus();
+          if (typeof newQuoteInput.setSelectionRange === 'function') {
+            newQuoteInput.setSelectionRange(innerPos, innerPos);
+          }
+        }
+        updateQuoteComposerUI();
+      });
+    }
+
+    if (quoteForm) {
+      quoteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = (newQuoteInput ? newQuoteInput.value : '').trim();
+        const author = document.getElementById('new-quote-author').value.trim();
+
+        if (!text) return;
+
+        try {
+          const created = await API.createQuote({ text, author });
+          if (newQuoteInput) newQuoteInput.value = '';
+          document.getElementById('new-quote-author').value = '';
+          updateQuoteComposerUI();
+          await Views.loadState();
+          Views.renderSettings();
+          Views.renderTopQuote(true, created && created.id);
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    }
 
     // Settings: Export / Import
     document.getElementById('export-btn').addEventListener('click', async () => {
@@ -585,7 +707,7 @@ const App = {
             }
           }
           if (msg) {
-            msg.textContent = '✓ You are already on the latest version (v3.10)!';
+            msg.textContent = '✓ You are already on the latest version (v3.11)!';
             setTimeout(() => {
               if (msg) msg.style.display = 'none';
             }, 3500);

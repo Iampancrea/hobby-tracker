@@ -379,7 +379,22 @@ input, textarea {
   line-height: 1.4;
   letter-spacing: -0.02em;
   margin: 0 0 8px 0;
+  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.quote-impact-big {
+  font-size: 2em;
+  line-height: 1.15;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #141310;
+}
+
+html[data-theme="dark"] .quote-impact-big {
+  color: #fff8ed;
+  text-shadow: 0 2px 12px rgba(229, 169, 82, 0.24);
 }
 
 .top-quote-banner cite {
@@ -918,6 +933,12 @@ input, textarea {
 .quote-item-text {
   font-size: 14px;
   margin-bottom: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.quote-item-text .quote-impact-big {
+  font-size: 1.55em;
 }
 
 .quote-item-author {
@@ -993,11 +1014,127 @@ html[data-theme="dark"] .quote-custom-pill {
 
 .add-quote-form {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quote-composer-box {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quote-composer-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(63, 163, 77, 0.14);
+}
+
+.quote-composer-box textarea {
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.quote-composer-box textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.quote-composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.quote-format-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.quote-format-btn:hover {
+  border-color: #d97706;
+  color: #b45309;
+}
+
+.quote-format-btn.active {
+  background: rgba(217, 119, 6, 0.14);
+  border-color: #d97706;
+  color: #b45309;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.16);
+}
+
+.quote-format-glyph {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.quote-composer-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.quote-live-preview {
+  padding: 10px 12px;
+  border-top: 1px dashed var(--border);
+  background: rgba(217, 119, 6, 0.04);
+}
+
+.quote-live-preview-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.quote-live-preview-text {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.quote-live-preview-text .quote-impact-big {
+  font-size: 1.75em;
+}
+
+.add-quote-bottom-row {
+  display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.add-quote-form input {
+.add-quote-bottom-row input {
   flex: 1;
   min-width: 150px;
   padding: 10px 12px;
@@ -1006,9 +1143,51 @@ html[data-theme="dark"] .quote-custom-pill {
   font-size: 14px;
 }
 
-.add-quote-form input:focus {
+.add-quote-bottom-row input:focus {
   outline: none;
   border-color: var(--primary);
+}
+
+html[data-theme="dark"] .quote-composer-box {
+  background: #161310;
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] .quote-composer-box textarea {
+  background: transparent;
+  border: none;
+}
+
+html[data-theme="dark"] .quote-composer-box textarea:focus {
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .quote-composer-box textarea::placeholder {
+  color: var(--text-subtle);
+  opacity: 1;
+}
+
+html[data-theme="dark"] .quote-composer-toolbar {
+  background: #201c18;
+  border-top-color: var(--border);
+}
+
+html[data-theme="dark"] .quote-format-btn {
+  background: #28231e;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme="dark"] .quote-format-btn:hover,
+html[data-theme="dark"] .quote-format-btn.active {
+  background: rgba(229, 169, 82, 0.16);
+  border-color: rgba(229, 169, 82, 0.55);
+  color: #f3c16c;
+}
+
+html[data-theme="dark"] .quote-live-preview {
+  background: rgba(229, 169, 82, 0.06);
+  border-top-color: var(--border);
 }
 
 /* === MODALS === */

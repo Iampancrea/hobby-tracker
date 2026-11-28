@@ -618,9 +618,24 @@
             <h3>Motivational Quotes</h3>
             <div id="quotes-list"></div>
             <form id="add-quote-form" class="add-quote-form">
-              <input type="text" id="new-quote-text" placeholder="Quote text..." required>
-              <input type="text" id="new-quote-author" placeholder="Author (optional)">
-              <button type="submit" class="btn btn-primary btn-small">Add Quote</button>
+              <div class="quote-composer-box">
+                <textarea id="new-quote-text" rows="2" placeholder="Write your quote... (Shift+Enter for new line)" autocomplete="off" required></textarea>
+                <div class="quote-composer-toolbar">
+                  <button type="button" id="quote-big-caps-btn" class="quote-format-btn" title="Make selected words (or next words) 2× Big Caps">
+                    <span class="quote-format-glyph">AA</span>
+                    <span>2× Big Caps</span>
+                  </button>
+                  <span class="quote-composer-hint">Shift+Enter for new line · Enter to add</span>
+                </div>
+                <div id="quote-live-preview" class="quote-live-preview" style="display:none;">
+                  <span class="quote-live-preview-label">Preview</span>
+                  <div id="quote-live-preview-text" class="quote-live-preview-text"></div>
+                </div>
+              </div>
+              <div class="add-quote-bottom-row">
+                <input type="text" id="new-quote-author" placeholder="Author (optional)" autocomplete="off">
+                <button type="submit" class="btn btn-primary btn-small">Add Quote</button>
+              </div>
             </form>
           </div>
 
@@ -644,7 +659,7 @@
               Hobby Tracker automatically checks for and installs new updates every time you open the app on PC and Android.
             </p>
             <div class="update-info-row">
-              <span class="app-version-badge">Version 3.10</span>
+              <span class="app-version-badge">Version 3.11</span>
               <button type="button" id="check-updates-btn" class="btn btn-secondary btn-small">Check for Updates Now</button>
             </div>
             <div id="update-status-msg" class="sync-status-message" style="display:none;"></div>

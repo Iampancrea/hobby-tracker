@@ -32,6 +32,15 @@ const Views = {
     this.renderTopQuote();
   },
 
+  formatQuoteHtml(rawText) {
+    const cleanText = (rawText || '').trim().replace(/^["“]+|["”]+$/g, '');
+    const escaped = this.escapeHtml(cleanText);
+    const formatted = escaped.replace(/\^\^([\s\S]+?)\^\^/g, (_, inner) => {
+      return `<span class="quote-impact-big">${inner.toUpperCase()}</span>`;
+    });
+    return `"${formatted}"`;
+  },
+
   renderTopQuote(forceRefresh = false, preferredQuoteId = null) {
     const banner = document.getElementById('top-quote-banner');
     if (!banner) return;
@@ -91,8 +100,7 @@ const Views = {
     const quoteNextBtn = document.getElementById('quote-next-btn');
 
     if (quoteTextEl) {
-      const cleanText = (selectedQuote.text || '').trim().replace(/^["“]+|["”]+$/g, '');
-      quoteTextEl.textContent = `"${cleanText}"`;
+      quoteTextEl.innerHTML = this.formatQuoteHtml(selectedQuote.text);
     }
 
     if (quoteAuthorEl) {
@@ -1364,7 +1372,7 @@ const Views = {
         html += `
           <div class="quote-item ${isActive ? 'is-active' : ''}">
             <div class="quote-item-content">
-              <div class="quote-item-text">${this.escapeHtml(quote.text)}</div>
+              <div class="quote-item-text">${this.formatQuoteHtml(quote.text)}</div>
               <div class="quote-item-meta">
                 <span class="quote-item-author">— ${this.escapeHtml(quote.author || 'Unknown')}</span>
                 ${quote.custom ? '<span class="quote-custom-pill">Yours</span>' : ''}
